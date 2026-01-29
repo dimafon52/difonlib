@@ -2,7 +2,6 @@
 # Makefile for difonlib
 # ==========================
 
-
 all: setup check-all build check test
 setup: clean .setup 
 # Все проверки: стиль, типы, тесты
