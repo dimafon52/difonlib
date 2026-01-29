@@ -1,0 +1,7 @@
+08.07.25
+## Get Tinytuya struct data devices (local_keys of each devs)
+## https://www.youtube.com/watch?v=_vgDJxThNmg
+
+1. Run docker_android_emulator.sh
+# 2. When android emulator is up - run Tuya Smart Live on the emulator(web page)
+

@@ -1,0 +1,18 @@
+
+* Scan available Bluetooth HID devices
+#+begin_src python :results output
+  from difonlib.bt_utils import bt_scan_hid_devs, btctl_add
+  from difonlib.utils import print_dicts_list
+  available_hid_devs = bt_scan_hid_devs()
+  print_dicts_list(available_hid_devs)
+#+end_src
+
+* Add Bluetooth device
+#+begin_src python :results output
+  from difonlib.bt_utils import btctl_add
+  btctl_add("12:22:34:E9:DD:9B")
+#+end_src
+
+#+RESULTS:
+
+

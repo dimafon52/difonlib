@@ -1,0 +1,200 @@
+import logging
+import re
+import inspect
+import struct
+import os
+import yaml
+import shutil
+import glob
+from typing import Any, Callable, Optional, cast, List
+from pathlib import Path
+
+# Text print style
+RESET = 0
+BOLD = 1
+DARKEN = 2
+ITALIC = 3
+UNDERLINE = 4
+BLINK_SLOW = 5
+BLINK_FAST = 6
+REVERSE = 7
+HIDE = 8
+CROSS_OUT = 9
+
+# alias color_table2='bash -c "for (( i=1; i<256; i++ )); do tput setaf \$i; echo -n [\$i]; done; tput sgr0; echo"'
+
+COLOR_OFF = "\x1b[0m"
+
+# ---
+RED = 160
+GOLD = 222
+
+
+# MSG_COLOR = f"\x1b[{BOLD};38;5;{RED}m"
+MSG_COLOR = f"\x1b[{RESET};38;5;{45}m"
+# CRITICAL 50
+# ERROR    40
+# WARNING  30
+# INFO     20
+# DEBUG    10
+# NOTSET    0
+
+logging.basicConfig(
+    format=f"{MSG_COLOR}[%(filename)s:%(lineno)d]: %(message)s{COLOR_OFF}",
+    level=logging.DEBUG,
+)
+logdbg = logging.debug
+
+
+class UtilsError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+def __LINE__() -> int:
+    return inspect.stack()[1][2]
+
+
+def is_mac_address(mac: str) -> bool:
+    """
+    Validates a MAC address string.
+    Acceptable formats: XX:XX:XX:XX:XX:XX (case-insensitive)
+    """
+    mac_regex = re.compile(r"^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$")
+    return bool(mac_regex.match(mac))
+
+
+def is_mac_address2(mac: str) -> bool:
+    """
+    Validates a MAC address string.
+    Acceptable formats: XXXXXXXXXXXX (case-insensitive)
+    """
+    mac_regex = re.compile(r"^([0-9A-Fa-f]{2}){6}$")
+    return bool(mac_regex.match(mac))
+
+
+def mac_format(mac: str) -> str:
+    """112233445566 -> 11:22:33:44:55:66"""
+    _mac = re.findall("[0-9A-Fa-f]{2}", mac)
+    if len(mac) != 12 or len(_mac) != 6:
+        raise UtilsError(f"Invalid MAC address: {mac}")
+    return ":".join(_mac)
+
+
+def to_signed(number: int, bits: int = 32) -> int:
+    mask: int = (2**bits) - 1
+    if number & (1 << (bits - 1)):
+        return number | ~mask
+    else:
+        return number & mask
+
+
+def swap32(i: int) -> int:
+    return cast(int, struct.unpack("<I", struct.pack(">I", i))[0])
+
+
+def swap16(i: int) -> int:
+    return int(struct.unpack("<H", struct.pack(">H", i))[0])
+
+
+def fs_remove_dir_content(dir_path: str) -> None:
+    shutil.rmtree(dir_path)
+    os.mkdir(dir_path)
+
+
+def file_get_latest(path: str, fpatern: str) -> Optional[str]:
+    files = glob.glob(os.path.join(path, fpatern))  # * means all if need specific format then *.csv
+    if not files:
+        return None
+    latest_file = max(files, key=os.path.getmtime)  # modify time
+    return latest_file
+
+
+def print_lists(lst: list, shift: str = " ") -> None:
+    for v in lst:
+        if isinstance(v, list):
+            print_lists(v, shift=shift + "   ")
+        else:
+            print(shift, v)
+
+
+# import configparser
+def print_dicts(dic: dict, shift: str = " ") -> None:
+    # Get max length of key line
+    klen = 0
+    for k in dic.keys():
+        kl = len(str(k))
+        if kl > klen:
+            klen = kl
+    for k, v in dic.items():
+        # print(f"**v: {type(v)}")
+        # if isinstance(v, (dict, configparser.SectionProxy)):
+        if isinstance(v, (dict)):
+            print(shift, k, ":")
+            print_dicts(v, shift=shift + "   ")
+        else:
+            print(shift, f"{k:{klen}} : {v}")
+
+
+def print_dicts_list(dicts_list: List[dict]) -> None:
+    for d in dicts_list:
+        print_dicts(d)
+        print("------------------------")
+
+
+def print_ctype_fields(
+    ctype_struct: Any,
+    indent: str = "    ",
+    show_hex: bool = False,
+    logger: Callable[[str], None] = print,
+) -> None:
+    alen = 0
+    for field_name, field_type in ctype_struct._fields_:
+        a = len(str(field_name))
+        if a > alen:
+            alen = a
+    for field_name, field_type in ctype_struct._fields_:
+        try:
+            if show_hex:
+                logger(f"{indent}{field_name:{alen}}: 0x{getattr(ctype_struct, field_name):X}")
+            else:
+                logger(f"{indent}{field_name:{alen}}: {getattr(ctype_struct, field_name):d}")
+        except Exception:
+            logger(f"{indent}{field_name}:")
+            print_ctype_fields(
+                getattr(ctype_struct, field_name),
+                indent=(indent + "    "),
+                show_hex=show_hex,
+                logger=logger,
+            )
+
+
+class YamlConfig:
+    def __init__(self, cfg_path: str):
+        self.config_path = Path(cfg_path)
+        self.config: dict = {}
+        self.load()
+
+    def clear(self) -> None:
+        self.config = {}
+        self.save()
+
+    def load(self) -> None:
+        if not self.config_path.exists():
+            self.save()
+        with self.config_path.open() as f:
+            self.config = yaml.safe_load(f) or {}
+
+    def save(self) -> None:
+        with self.config_path.open("w") as f:
+            yaml.safe_dump(
+                self.config,
+                f,
+                sort_keys=False,
+                allow_unicode=True,
+            )
+
+
+if __name__ == "__main__":
+    logdbg("Hello 0123456789 ABCDEF")
+    cfg = YamlConfig("./___CONFIG.yaml")

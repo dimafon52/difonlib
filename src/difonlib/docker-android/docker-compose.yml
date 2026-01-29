@@ -1,0 +1,29 @@
+
+### https://www.youtube.com/watch?v=_vgDJxThNmg
+# docker run --privileged -d -p 6080:6080 -p 5554:5554 -p 5555:5555 -e EMULATOR_DEVICE=Samsung Galaxy S10 -e WEB_VNC=true --device /dev/kvm --name android-container budtmo/docker-android:emulator_11.0
+# Install com.tuya.smartlife_3.6.1.apk
+# adb connect 127.0.0.1:5555
+# adb install ./com.tuya.smartlife_3.6.1.apk
+# Run tuya on the emulator
+#   webbrowser http://127.0.0.1:6080 -> connect -> run tuya app
+# adb pull /data/data/com.tuya.smartlife/shared_prefs .
+###
+
+services:
+  tuya_home:
+    # image: android-container-dima:1
+    image: budtmo/docker-android:emulator_11.0
+    privileged: true
+    devices:
+      - /dev/kvm
+    ports:
+      - 6080:6080
+      - 5555:5555
+      - 5554:5554
+    volumes:
+      # - ./___data_shared_prefs:/data/data/com.tuya.smartlife/shared_prefs:ro
+      - ./___data:/data
+    environment:
+      EMULATOR_DEVICE: Samsung Galaxy S10
+      WEB_VNC: true
+    
