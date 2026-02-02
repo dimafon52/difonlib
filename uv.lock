@@ -529,7 +529,7 @@ wheels = [
 
 [[package]]
 name = "difonlib"
-version = "0.2.2"
+version = "0.2.2a1"
 source = { editable = "." }
 dependencies = [
     { name = "evdev" },
