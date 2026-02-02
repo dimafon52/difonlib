@@ -2,7 +2,7 @@
 # Makefile for difonlib
 # ==========================
 
-all: setup check-all build check test
+all: setup check-all build check-dist test
 setup: clean .setup 
 # Все проверки: стиль, типы, тесты
 check-all: fix lint format-check typecheck
@@ -34,7 +34,7 @@ build:
 	uv build
 
 # Проверка собранного пакета
-check:
+check-dist:
 	uv run twine check dist/*
 
 # Очистка временных файлов
