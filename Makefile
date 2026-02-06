@@ -27,7 +27,7 @@ add-tool:
 
 # Запуск тестов
 test:
-	uv run pytest -s # -s if during test used input(".....")
+	uv run pytest # -s if during test used input(".....")
 
 # Локальная сборка пакета (wheel + sdist)
 build:

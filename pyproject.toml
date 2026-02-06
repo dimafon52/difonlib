@@ -36,9 +36,9 @@ warn_return_any = true
 mypy_path = ["src"]
 
 
-[tool.pytest.ini_options]
-addopts = "-v"
-testpaths = ["tests"]
+# [tool.pytest.ini_options]
+# addopts = "-v"
+# testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
