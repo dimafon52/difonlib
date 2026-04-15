@@ -1,5 +1,5 @@
 from pathlib import Path
-from evdev import InputDevice, categorize
+from evdev import InputDevice, categorize, ecodes, list_devices
 from evdev.events import KeyEvent
 from typing import Dict, Any, List, Optional
 from difonlib.utils import logdbg
@@ -29,6 +29,38 @@ class IDevKbdKey:
     scancode: int = 0
     hold_time: float = 0
     keycode: str | tuple = ""
+
+
+def idev_get_connected_devs() -> List[InputDevice]:
+    return [InputDevice(p) for p in list_devices()]
+
+
+def is_remote_ctrl(dev: InputDevice) -> bool:
+    caps = dev.capabilities()
+    if ecodes.EV_KEY not in caps:
+        return False
+    keys = set(caps[ecodes.EV_KEY])
+    remote_keys = {
+        ecodes.KEY_UP,
+        ecodes.KEY_DOWN,
+        ecodes.KEY_LEFT,
+        ecodes.KEY_RIGHT,
+        ecodes.KEY_OK,
+        ecodes.KEY_SELECT,
+        ecodes.KEY_BACK,
+        ecodes.KEY_PLAYPAUSE,
+        ecodes.KEY_VOLUMEUP,
+        ecodes.KEY_VOLUMEDOWN,
+        ecodes.KEY_HOME,
+        ecodes.KEY_MENU,
+    }
+    return bool(remote_keys & keys)
+
+
+def idev_get_dev_by_uniq(uniq: str) -> Optional[InputDevice]:
+    devs = idev_get_connected_devs()
+    matched = [dev for dev in devs if dev.uniq == uniq and is_remote_ctrl(dev)]
+    return matched[0] if matched else None
 
 
 def get_connected_input_devices() -> List[Dict[str, Any]]:

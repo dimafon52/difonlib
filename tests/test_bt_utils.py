@@ -1,11 +1,12 @@
 from difonlib.utils import logdbg
 from difonlib.bt_utils import bt_hid_conn_devs, get_connected_input_devices
 
-# import pytest
+import pytest
 
 dbg = logdbg
 
 
+@pytest.mark.slow
 def test_bt_utils():
     assert type(bt_hid_conn_devs()) is list, "Return value type is not list"
     assert type(get_connected_input_devices()) is list, "Return value type is not list"
