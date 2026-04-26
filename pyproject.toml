@@ -5,9 +5,13 @@ description = "python libraries"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "bleak>=3.0.1",
     "evdev>=1.9.2",
+    "hid>=1.0.9",
     "nicegui>=3.2.0",
     "pexpect>=4.9.0",
+    "pydbus>=0.6.0",
+    "pygobject>=3.56.2",
     "pyyaml>=6.0.3",
     "tinytuya>=1.17.4",
     "types-pexpect>=4.9.0.20250916",

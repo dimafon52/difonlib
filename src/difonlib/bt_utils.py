@@ -47,7 +47,7 @@ def bt_parse_cod(cod_val: str) -> str:
     return MAJOR_CLASSES.get(major, f"0x{major:02X}")
 
 
-def bt_scan() -> list:
+def bt_scan_hcitool_inq() -> list:
     # px = pexpect.spawn("hcitool scan", encoding="utf-8")
     devs = []
     # inquery remote devices
@@ -69,7 +69,7 @@ def bt_scan() -> list:
 
 
 def bt_scan_hid_devs() -> list:
-    devs = bt_scan()
+    devs = bt_scan_hcitool_inq()
     hid_devs = []
     for dev in devs:
         if dev["class"] == "HID Device":
@@ -77,7 +77,7 @@ def bt_scan_hid_devs() -> list:
     return hid_devs
 
 
-def bt_scan2() -> list:
+def bt_scan_hcitool_scan() -> list:
     # px = pexpect.spawn("hcitool scan", encoding="utf-8")
     devs = []
     _devs = os.popen("hcitool scan").readlines()
