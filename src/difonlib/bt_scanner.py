@@ -27,9 +27,9 @@ HID_USAGE_NAMES = {
     0x09: "Tablet PC Controls",
 }
 
+
 # Bluetooth HID Service UUID
 HID_SERVICE_UUID = "00001812-0000-1000-8000-00805f9b34fb"
-
 
 MAJOR_CLASSES = {
     0x00: "Miscellaneous",
@@ -66,7 +66,7 @@ def bt_parse_cod(cod_val: int) -> str:
     return MAJOR_CLASSES.get(major, f"0x{major:02X}")
 
 
-async def adapter_restart(adapter_path: str = "/org/bluez/hci0", duration: float = 0.5):
+async def adapter_restart(adapter_path: str = "/org/bluez/hci0", duration: float = 0.5) -> None:
     bus = pydbus.SystemBus()
     adapter = bus.get("org.bluez", adapter_path)
     adapter.StartDiscovery()
@@ -113,14 +113,14 @@ def scan_usb_hid_devices() -> list[dict]:
 # ─── Bluetooth LE HID Devices (nearby) ────────────────────────────────────────
 
 
-class BLEHIDScanner:
-    def __init__(self, duration: float = 5.0, dev_type:str=""):
+class BluetoothScanner:
+    def __init__(self, duration: float = 5.0, dev_type: str = ""):
         self.duration = duration
         self.found: dict[str, dict] = {}  # addr -> device info
         self.dev_type = dev_type
-        self.available_types = [v for _,v in MAJOR_CLASSES.items()]
-        
-    def _on_device(self, device: BLEDevice, adv: AdvertisementData):
+        self.available_types = [v for v in MAJOR_CLASSES.values()]
+
+    def _on_device(self, device: BLEDevice, adv: AdvertisementData) -> None:
         # print(f"device: {device}")
         # print(f"Class: {device.details['Class']}")
         # print(f"adv: {adv}")
@@ -152,10 +152,11 @@ class BLEHIDScanner:
         #     f"  [+] Found: {device.name or 'Unknown':30s}  {addr}  RSSI {adv.rssi} dBm"
         # )
         # print(f"      service_uuids: {service_uuids}")
-    def _filter(self, devs:list[dict], dev_type:str):
+
+    def _filter(self, devs: list[dict], dev_type: str) -> list[dict]:
         _devs = []
         for dev in devs:
-            if dev['dev_class'] == dev_type:
+            if dev["dev_class"] == dev_type:
                 _devs.append(dev)
         return _devs
 
@@ -166,7 +167,7 @@ class BLEHIDScanner:
         if self.dev_type in self.available_types:
             return self._filter(list(self.found.values()), self.dev_type)
         elif self.dev_type != "":
-            print(f" =!= Device Type ERROR")
+            print(" =!= Device Type ERROR")
             print(f"   Type '{self.dev_type}' is not available.")
             print(f"   Available types: {self.available_types}")
         return list(self.found.values())
@@ -179,15 +180,15 @@ class BLEHIDScanner:
 #             hid_devs.append(dev)
 #     return hid_devs
 
-    
+
 # ─── Pretty printing ───────────────────────────────────────────────────────────
 
 
-def print_separator(char="─", width=60):
+def print_separator(char: str = "─", width: int = 60) -> None:
     print(char * width)
 
 
-def print_usb_devices(devices: list[dict]):
+def print_usb_devices(devices: list[dict]) -> None:
     print_separator("═")
     print(f"  USB HID DEVICES  ({len(devices)} found)")
     print_separator("═")
@@ -208,7 +209,7 @@ def print_usb_devices(devices: list[dict]):
     print()
 
 
-def print_bt_devices(devices: list[dict], type="DEVICES"):
+def print_bt_devices(devices: list[dict], type: str = "DEVICES") -> None:
     print_separator("═")
     print(f"  BLUETOOTH AVAILABLE {type}  ({len(devices)} found)")
     print_separator("═")
@@ -229,10 +230,11 @@ def print_bt_devices(devices: list[dict], type="DEVICES"):
 
     print()
 
+
 # ─── Main ──────────────────────────────────────────────────────────────────────
 
 
-async def main():
+async def main() -> None:
     print("\n╔══════════════════════════════════════════════════════════╗")
     print("║          Bluetooth Device Scanner                        ║")
     print("╚══════════════════════════════════════════════════════════╝\n")
@@ -250,10 +252,10 @@ async def main():
 
     # 2. BLE HID
     try:
-        # bt_scanner = BLEHIDScanner(duration=6.0, dev_type="Audio/Video")
+        # bt_scanner = BluetoothScanner(duration=6.0, dev_type="Audio/Video")
         dev_type = "HID Device"
         # dev_type = ""
-        bt_scanner = BLEHIDScanner(duration=6.0, dev_type=dev_type)
+        bt_scanner = BluetoothScanner(duration=6.0, dev_type=dev_type)
         bt_devices = await bt_scanner.run()
         print_bt_devices(bt_devices, type=dev_type)
     except Exception as e:
@@ -269,6 +271,7 @@ async def main():
     # )
     # print_separator("═")
     # print(f"bt_devices: {bt_devices}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

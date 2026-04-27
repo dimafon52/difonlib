@@ -1,17 +1,26 @@
 #!/usr/bin/env python
 
+import sys
+import time
 import os
 import re
 import pexpect
-import sys
-import time
 from typing import Optional
 from ctypes import LittleEndianStructure, c_uint32
+
+from typing import Any
+
 from difonlib.utils import logdbg
 from difonlib.input_devs import get_connected_input_devices
 
+import asyncio
+import pydbus
+from bleak import BleakScanner
+from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
 
 dbg = logdbg
+# dbg = print
 
 MAJOR_CLASSES = {
     0x00: "Miscellaneous",
@@ -39,12 +48,78 @@ class CoD(LittleEndianStructure):
     ]
 
 
-def bt_parse_cod(cod_val: str) -> str:
+def bt_parse_cod(cod_val: Any) -> str:
     """Разобрать Class of Device (CoD) в словарь с описанием"""
-    cod32 = c_uint32(int(cod_val, 0))
+    cod32 = c_uint32(int(cod_val))
     fields = CoD.from_buffer_copy(cod32)
     major = fields.MajorDevClass
     return MAJOR_CLASSES.get(major, f"0x{major:02X}")
+
+
+# Bluetooth HID Service UUID
+HID_SERVICE_UUID = "00001812-0000-1000-8000-00805f9b34fb"
+
+
+class BluetoothScanner:
+    def __init__(self, duration: float = 5.0, dev_type: str = ""):
+        self.duration = duration
+        self.found: dict[str, dict] = {}  # addr -> device info
+        self.dev_type = dev_type
+        self.available_types = [v for v in MAJOR_CLASSES.values()]
+
+    def _on_device(self, device: BLEDevice, adv: AdvertisementData) -> None:
+        # print(f"device: {device}")
+        # print(f"Class: {device.details['Class']}")
+        # print(f"adv: {adv}")
+        service_uuids = [u.lower() for u in (adv.service_uuids or [])]
+        ble_hid_dev = HID_SERVICE_UUID in service_uuids
+        dclass = device.details.get("props", {}).get("Class")
+        # print(f" = DETAILS: {device.details}")
+        dev_class = None
+        if ble_hid_dev:
+            dev_class = "HID Device"
+        elif dclass:
+            dev_class = bt_parse_cod(dclass)
+
+        addr = device.address
+        if addr in self.found:
+            # update RSSI
+            self.found[addr]["rssi"] = adv.rssi
+            return
+
+        self.found[addr] = {
+            "name": device.name or "Unknown",
+            "address": addr,
+            "dev_class": dev_class,
+            "rssi": adv.rssi,
+            "services": service_uuids,
+            "tx_power": adv.tx_power,
+        }
+        print(".", end="", flush=True)
+        # print(
+        #     f"  [+] Found: {device.name or 'Unknown':30s}  {addr}  RSSI {adv.rssi} dBm"
+        # )
+        # print(f"      service_uuids: {service_uuids}")
+
+    def _filter(self, devs: list[dict], dev_type: str) -> list[dict]:
+        _devs = []
+        for dev in devs:
+            if dev["dev_class"] == dev_type:
+                _devs.append(dev)
+        return _devs
+
+    async def run(self) -> list[dict]:
+        print(f"   Scanning for bluetooth devices {self.duration}s ...", end="")
+        async with BleakScanner(detection_callback=self._on_device):
+            await asyncio.sleep(self.duration)
+        print(" END\n")
+        if self.dev_type in self.available_types:
+            return self._filter(list(self.found.values()), self.dev_type)
+        elif self.dev_type != "":
+            print(" =!= Device Type ERROR")
+            print(f"   Type '{self.dev_type}' is not available.")
+            print(f"   Available types: {self.available_types}")
+        return list(self.found.values())
 
 
 def bt_scan_hcitool_inq() -> list:
@@ -68,15 +143,6 @@ def bt_scan_hcitool_inq() -> list:
     return devs
 
 
-def bt_scan_hid_devs() -> list:
-    devs = bt_scan_hcitool_inq()
-    hid_devs = []
-    for dev in devs:
-        if dev["class"] == "HID Device":
-            hid_devs.append(dev)
-    return hid_devs
-
-
 def bt_scan_hcitool_scan() -> list:
     # px = pexpect.spawn("hcitool scan", encoding="utf-8")
     devs = []
@@ -93,6 +159,40 @@ def bt_scan_hcitool_scan() -> list:
             dev["name"] = name
             devs.append(dev)
     return devs
+
+
+def bt_scan_hid_devs() -> list:
+    devs = bt_scan_hcitool_inq()
+    hid_devs = []
+    for dev in devs:
+        if dev["class"] == "HID Device":
+            hid_devs.append(dev)
+    return hid_devs
+
+
+async def bt_scan_devs(  # universally version for classic and ble devices
+    dev_type: str = "HID Device",
+    inquiry_warmup: float = 4.0,  # время для Classic Inquiry
+    scan_duration: float = 6.0,  # время bleak сканирования
+    adapter_path: str = "/org/bluez/hci0",
+) -> list[dict]:
+    bus = pydbus.SystemBus()
+    adapter = bus.get("org.bluez", adapter_path)
+    adapter.SetDiscoveryFilter({})
+    adapter.StartDiscovery()
+    await asyncio.sleep(inquiry_warmup)
+    try:
+        bt_scanner = BluetoothScanner(duration=scan_duration, dev_type=dev_type)
+        bt_devices = await bt_scanner.run()
+    except Exception as e:
+        print(f"  Bluetooth scan failed: {e}")
+        bt_devices = []
+    finally:
+        try:
+            adapter.StopDiscovery()
+        except Exception as e:
+            print(f"  StopDiscovery() error: {e}")
+    return bt_devices
 
 
 def btctl_add(mac_address: str, timeout: int = 10) -> Optional[dict]:
@@ -319,18 +419,23 @@ def bt_hid_conn_devs() -> list:
 
 if __name__ == "__main__":
 
-    dev_mac = "41:42:68:D8:DA:39"
+    # dev_mac = "41:42:68:D8:DA:39"
 
-    from difonlib.utils import print_dicts_list
+    # from difonlib.utils import print_dicts_list
 
-    print(" ======== ALL connected devices ==========")
-    all_connected_devs = get_connected_input_devices()
-    print_dicts_list(all_connected_devs)
+    # print(" ======== ALL connected devices ==========")
+    # all_connected_devs = get_connected_input_devices()
+    # print_dicts_list(all_connected_devs)
 
-    print(" ======== HID connected devices ==========")
-    conn_devs = bt_hid_conn_devs()
-    print_dicts_list(conn_devs)
+    # print(" ======== HID connected devices ==========")
+    # conn_devs = bt_hid_conn_devs()
+    # print_dicts_list(conn_devs)
 
+    # input("ssssssssssssssssssss")
+
+    # devs = asyncio.run(bt_scan_devs(dev_type=""))
+    devs = asyncio.run(bt_scan_devs())
+    print(f"devs: {devs}")
     # available_bt_devs = bt_scan()
     # print_lists(available_bt_devs)  # //Dima
 

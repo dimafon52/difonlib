@@ -2,6 +2,7 @@ from pathlib import Path
 from evdev import InputDevice, categorize, ecodes, list_devices
 from evdev.events import KeyEvent
 from typing import Dict, Any, List, Optional
+
 from difonlib.utils import logdbg
 from dataclasses import dataclass
 import re

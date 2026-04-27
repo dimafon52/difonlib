@@ -39,11 +39,30 @@ MSG_COLOR = f"\x1b[{RESET};38;5;{45}m"
 # DEBUG    10
 # NOTSET    0
 
-logging.basicConfig(
-    format=f"{MSG_COLOR}[%(filename)s:%(lineno)d]: %(message)s{COLOR_OFF}",
-    level=logging.DEBUG,
+
+# Глобальные логгеры библиотек — заглушить
+logging.getLogger().setLevel(logging.WARNING)  # root logger
+
+# Свой именованный логгер
+logger = logging.getLogger("DifonLibLogger")
+logger.setLevel(logging.DEBUG)
+
+# Handler только на свой логгер
+handler = logging.StreamHandler()
+handler.setFormatter(
+    logging.Formatter(f"{MSG_COLOR}[%(filename)s:%(lineno)d]: %(message)s{COLOR_OFF}")
 )
-logdbg = logging.debug
+logger.addHandler(handler)
+logger.propagate = False  # не пускать в root logger
+
+logdbg = logger.debug
+
+
+# logging.basicConfig(
+#     format=f"{MSG_COLOR}[%(filename)s:%(lineno)d]: %(message)s{COLOR_OFF}",
+#     level=logging.DEBUG,
+# )
+# logdbg = logging.debug
 
 
 class UtilsError(Exception):
