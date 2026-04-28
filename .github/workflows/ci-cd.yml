@@ -21,6 +21,7 @@ jobs:
           pkg-config \
           python3-dev \
           gir1.2-gtk-3.0
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Install uv
