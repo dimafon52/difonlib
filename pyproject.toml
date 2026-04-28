@@ -54,6 +54,7 @@ dev = [
     "mypy>=1.11.0",
     "twine>=5.1.1",
 ]
+gui = ["pygobject"]  # отдельная группа
 
 [tool.ruff]
 line-length = 100
