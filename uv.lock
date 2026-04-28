@@ -610,7 +610,6 @@ name = "difonlib"
 version = "0.2.6"
 source = { editable = "." }
 dependencies = [
-    { name = "black" },
     { name = "bleak" },
     { name = "evdev" },
     { name = "hid" },
@@ -619,11 +618,7 @@ dependencies = [
     { name = "pydbus" },
     { name = "pygobject" },
     { name = "pyyaml" },
-    { name = "ruff" },
     { name = "tinytuya" },
-    { name = "types-pexpect" },
-    { name = "types-pyyaml" },
-    { name = "types-xmltodict" },
     { name = "xmltodict" },
 ]
 
@@ -634,11 +629,13 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
     { name = "twine" },
+    { name = "types-pexpect" },
+    { name = "types-pyyaml" },
+    { name = "types-xmltodict" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "black", specifier = ">=25.11.0" },
     { name = "bleak", specifier = ">=3.0.1" },
     { name = "evdev", specifier = ">=1.9.2" },
     { name = "hid", specifier = ">=1.0.9" },
@@ -647,11 +644,7 @@ requires-dist = [
     { name = "pydbus", specifier = ">=0.6.0" },
     { name = "pygobject", specifier = ">=3.56.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "ruff", specifier = ">=0.14.5" },
     { name = "tinytuya", specifier = ">=1.17.4" },
-    { name = "types-pexpect", specifier = ">=4.9.0.20250916" },
-    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
-    { name = "types-xmltodict", specifier = ">=1.0.1.20250920" },
     { name = "xmltodict", specifier = ">=1.0.2" },
 ]
 
@@ -662,6 +655,9 @@ dev = [
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "ruff", specifier = ">=0.6.0" },
     { name = "twine", specifier = ">=5.1.1" },
+    { name = "types-pexpect", specifier = ">=4.9.0.20250916" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
+    { name = "types-xmltodict", specifier = ">=1.0.1.20250920" },
 ]
 
 [[package]]

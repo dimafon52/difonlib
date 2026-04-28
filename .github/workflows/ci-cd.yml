@@ -40,13 +40,6 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcairo2-dev \
-            libgirepository1.0-dev \
-            pkg-config
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -54,9 +47,7 @@ jobs:
         uses: astral-sh/setup-uv@v2
         with:
           enable-cache: true
-      - name: Build
+      - name: Build and check
         run: make build
-      - name: Check build
-        run: make check-dist
       - name: Publish
         run: uv publish

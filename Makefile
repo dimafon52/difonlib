@@ -2,7 +2,7 @@
 # Makefile for difonlib
 # ==========================
 
-all: setup check-all build check-dist test
+all: setup check-all test
 setup: clean .setup 
 # Все проверки: стиль, типы, тесты
 check-all: fix lint format-check typecheck
@@ -30,11 +30,8 @@ test:
 	uv run pytest # -s if during test used input(".....")
 
 # Локальная сборка пакета (wheel + sdist)
-build:
+build: setup check-all test
 	uv build
-
-# Проверка собранного пакета
-check-dist:
 	uv run twine check dist/*
 
 # Очистка временных файлов
