@@ -115,9 +115,7 @@ def fs_remove_dir_content(dir_path: str) -> None:
 
 
 def file_get_latest(path: str, fpatern: str) -> Optional[str]:
-    files = glob.glob(
-        os.path.join(path, fpatern)
-    )  # * means all if need specific format then *.csv
+    files = glob.glob(os.path.join(path, fpatern))  # * means all if need specific format then *.csv
     if not files:
         return None
     latest_file = max(files, key=os.path.getmtime)  # modify time
@@ -170,13 +168,9 @@ def print_ctype_fields(
     for field_name, field_type in ctype_struct._fields_:
         try:
             if show_hex:
-                logger(
-                    f"{indent}{field_name:{alen}}: 0x{getattr(ctype_struct, field_name):X}"
-                )
+                logger(f"{indent}{field_name:{alen}}: 0x{getattr(ctype_struct, field_name):X}")
             else:
-                logger(
-                    f"{indent}{field_name:{alen}}: {getattr(ctype_struct, field_name):d}"
-                )
+                logger(f"{indent}{field_name:{alen}}: {getattr(ctype_struct, field_name):d}")
         except Exception:
             logger(f"{indent}{field_name}:")
             print_ctype_fields(
