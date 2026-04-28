@@ -58,13 +58,6 @@ logger.propagate = False  # не пускать в root logger
 logdbg = logger.debug
 
 
-# logging.basicConfig(
-#     format=f"{MSG_COLOR}[%(filename)s:%(lineno)d]: %(message)s{COLOR_OFF}",
-#     level=logging.DEBUG,
-# )
-# logdbg = logging.debug
-
-
 class UtilsError(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
@@ -122,7 +115,9 @@ def fs_remove_dir_content(dir_path: str) -> None:
 
 
 def file_get_latest(path: str, fpatern: str) -> Optional[str]:
-    files = glob.glob(os.path.join(path, fpatern))  # * means all if need specific format then *.csv
+    files = glob.glob(
+        os.path.join(path, fpatern)
+    )  # * means all if need specific format then *.csv
     if not files:
         return None
     latest_file = max(files, key=os.path.getmtime)  # modify time
@@ -175,9 +170,13 @@ def print_ctype_fields(
     for field_name, field_type in ctype_struct._fields_:
         try:
             if show_hex:
-                logger(f"{indent}{field_name:{alen}}: 0x{getattr(ctype_struct, field_name):X}")
+                logger(
+                    f"{indent}{field_name:{alen}}: 0x{getattr(ctype_struct, field_name):X}"
+                )
             else:
-                logger(f"{indent}{field_name:{alen}}: {getattr(ctype_struct, field_name):d}")
+                logger(
+                    f"{indent}{field_name:{alen}}: {getattr(ctype_struct, field_name):d}"
+                )
         except Exception:
             logger(f"{indent}{field_name}:")
             print_ctype_fields(
@@ -201,14 +200,14 @@ class YamlConfig:
     def load(self) -> None:
         if not self.config_path.exists():
             self.save()
-        with self.config_path.open() as f:
-            self.config = yaml.safe_load(f) or {}
+        with self.config_path.open() as fcfg:
+            self.config = yaml.safe_load(fcfg) or {}
 
     def save(self) -> None:
-        with self.config_path.open("w") as f:
+        with self.config_path.open("w") as fcfg:
             yaml.safe_dump(
                 self.config,
-                f,
+                fcfg,
                 sort_keys=False,
                 allow_unicode=True,
             )
