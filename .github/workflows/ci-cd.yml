@@ -15,6 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            pygobject \
             libcairo2-dev \
             libgirepository1.0-dev \
             pkg-config
