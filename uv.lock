@@ -607,7 +607,7 @@ wheels = [
 
 [[package]]
 name = "difonlib"
-version = "0.2.4"
+version = "0.2.9"
 source = { editable = "." }
 dependencies = [
     { name = "bleak" },
