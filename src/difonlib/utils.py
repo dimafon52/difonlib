@@ -182,9 +182,9 @@ def print_ctype_fields(
 
 
 class YamlConfig:
-    def __init__(self, cfg_path: str):
+    def __init__(self, cfg_path: str, **init_vals: Any):
         self.config_path = Path(cfg_path)
-        self.config: dict = {}
+        self.config: dict = init_vals
         self.load()
 
     def clear(self) -> None:
@@ -209,4 +209,9 @@ class YamlConfig:
 
 if __name__ == "__main__":
     logdbg("Hello 0123456789 ABCDEF")
-    cfg = YamlConfig("./___CONFIG.yaml")
+    cfg = YamlConfig("./___CONFIG.yaml", infrared_devs={}, remctrl_types={}, remctrl_devs=set())
+    cfg.config["remctrl_devs"].add("11:22:33:44:AA:55")
+    cfg.config["remctrl_devs"].add("AA:BB:CC:44:AA:55")
+    cfgrdevs: set = cfg.config["remctrl_devs"]
+    print(f"cfgrdevs: {cfgrdevs}")
+    cfg.save()
