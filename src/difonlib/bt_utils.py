@@ -173,7 +173,7 @@ def bt_scan_hid_devs() -> list:
 async def bt_scan_devs(  # universally version for classic and ble devices
     dev_type: str = "HID Device",
     inquiry_warmup: float = 4.0,  # время для Classic Inquiry
-    scan_duration: float = 6.0,  # время bleak сканирования
+    scan_duration: float = 4.0,  # время bleak сканирования
     adapter_path: str = "/org/bluez/hci0",
 ) -> list[dict]:
     bus = pydbus.SystemBus()

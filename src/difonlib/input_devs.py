@@ -60,7 +60,7 @@ def is_remote_ctrl(dev: InputDevice) -> bool:
 
 def idev_get_dev_by_uniq(uniq: str) -> Optional[InputDevice]:
     devs = idev_get_connected_devs()
-    matched = [dev for dev in devs if dev.uniq == uniq and is_remote_ctrl(dev)]
+    matched = [dev for dev in devs if dev.uniq.upper() == uniq.upper() and is_remote_ctrl(dev)]
     return matched[0] if matched else None
 
 
@@ -220,6 +220,10 @@ if __name__ == "__main__":
     # print_dicts_list(devs)
     # dbg(f"---------------------------------------------")  # //Dima
     # exit()
+    # devs = idev_get_dev_by_uniq("40:B4:cd:CE:31:d6")
+    # print(f"devs: {devs}")
+    # exit()
+
     devs = idev_get_by_field("Name", "Keychron Keychron K5")
     if devs:
         for dev in devs:
