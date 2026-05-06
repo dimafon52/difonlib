@@ -45,7 +45,10 @@ class CardTable:
             ).classes("w-full shadow-lg bg-black-900 text-gray-200")
 
             # --- Диалог подтверждения ---
-            with ui.dialog() as self.confirm_dialog, ui.card().classes("p-4"):
+            with (
+                ui.dialog().props("persistent") as self.confirm_dialog,
+                ui.card().classes("p-4"),
+            ):
                 self.dialog_title = ui.label().classes("text-lg font-bold mb-4")
                 with ui.row().classes("justify-end w-full gap-2"):
                     ui.button("No", color="gray", on_click=self.confirm_dialog.close)
@@ -53,7 +56,7 @@ class CardTable:
 
             # --- Диалог "Processing..." ---
             with (
-                ui.dialog() as self.processing_dialog,
+                ui.dialog().props("persistent") as self.processing_dialog,
                 ui.card().classes("p-4 items-center justify-center"),
             ):
                 with ui.row().classes("items-center gap-3"):
