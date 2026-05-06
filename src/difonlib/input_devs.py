@@ -12,9 +12,6 @@ dbg = logdbg
 
 # import asyncio
 
-KEY_LONG_PRESSED = 1000
-KEY_LONG_TIME_HOLD = 0.7
-
 
 @dataclass
 class IDevKbd:
@@ -56,6 +53,64 @@ def is_remote_ctrl(dev: InputDevice) -> bool:
         ecodes.KEY_MENU,
     }
     return bool(remote_keys & keys)
+
+
+ALPHA_KEYS = {getattr(ecodes, f"KEY_{c}") for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"}
+KEYBOARD_INDICATOR_KEYS = {
+    ecodes.KEY_ENTER,
+    ecodes.KEY_UP,
+    ecodes.KEY_DOWN,
+    ecodes.KEY_LEFT,
+    ecodes.KEY_RIGHT,
+    ecodes.KEY_BACK,
+    ecodes.KEY_HOME,
+    ecodes.KEY_MENU,
+}
+MOUSE_KEYS = {ecodes.BTN_LEFT, ecodes.BTN_RIGHT, ecodes.BTN_MIDDLE}
+KEYBOARD_NAME_RE = re.compile(r"\bkeyboard\b", re.IGNORECASE)
+
+# DEVICE_OVERRIDES: list[tuple[re.Pattern, str]] = [
+#     (re.compile(r"BOXPUT.*BPR1 Keyboard", re.IGNORECASE), "remote"),
+# ]
+
+
+def kbd_type(device: InputDevice) -> str:
+    # for pattern, kind in DEVICE_OVERRIDES:
+    #     if pattern.search(device.name):
+    #         return kind
+
+    caps = device.capabilities()
+
+    if ecodes.EV_KEY not in caps:
+        return "other"
+
+    keys = set(caps[ecodes.EV_KEY])
+
+    # Мышь: кнопки мыши + относительные оси
+    if MOUSE_KEYS & keys and ecodes.EV_REL in caps:
+        return "mouse"
+
+    has_alpha = ALPHA_KEYS.issubset(keys)
+    has_leds = ecodes.EV_LED in caps  # Caps/Num/Scroll Lock
+
+    # Полноценная клавиатура: буквы + индикаторы
+    if has_alpha and has_leds:
+        return "full"
+    # Буквы есть, но нет LED — composite/remote
+    if has_alpha and not has_leds:
+        return "remote"
+    # Навигация без EV_ABS — пульт
+    if KEYBOARD_INDICATOR_KEYS & keys and ecodes.EV_ABS not in caps:
+        return "remote"
+    # Fallback по имени
+    if KEYBOARD_NAME_RE.search(device.name) and keys:
+        return "remote"
+
+    return "other"
+
+
+def idev_get_keyboards() -> list[InputDevice]:
+    return [dev for dev in idev_get_connected_devs() if kbd_type(dev) in ("full", "remote")]
 
 
 def idev_get_dev_by_uniq(uniq: str) -> Optional[InputDevice]:
