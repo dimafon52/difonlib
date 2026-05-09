@@ -33,7 +33,7 @@ def idev_get_connected_devs() -> List[InputDevice]:
     return [InputDevice(p) for p in list_devices()]
 
 
-def is_remote_ctrl(dev: InputDevice) -> bool:
+def has_keys(dev: InputDevice) -> bool:
     caps = dev.capabilities()
     if ecodes.EV_KEY not in caps:
         return False
@@ -43,80 +43,43 @@ def is_remote_ctrl(dev: InputDevice) -> bool:
         ecodes.KEY_DOWN,
         ecodes.KEY_LEFT,
         ecodes.KEY_RIGHT,
-        ecodes.KEY_OK,
-        ecodes.KEY_SELECT,
-        ecodes.KEY_BACK,
-        ecodes.KEY_PLAYPAUSE,
-        ecodes.KEY_VOLUMEUP,
-        ecodes.KEY_VOLUMEDOWN,
-        ecodes.KEY_HOME,
-        ecodes.KEY_MENU,
+        # ecodes.KEY_OK,
+        # ecodes.KEY_SELECT,
+        # ecodes.KEY_BACK,
+        # ecodes.KEY_PLAYPAUSE,
+        # ecodes.KEY_VOLUMEUP,
+        # ecodes.KEY_VOLUMEDOWN,
+        # ecodes.KEY_HOME,
+        # ecodes.KEY_MENU,
+        # ecodes.KEY_NEXT,
+        # ecodes.KEY_PREVIOUS,
     }
     return bool(remote_keys & keys)
 
 
-ALPHA_KEYS = {getattr(ecodes, f"KEY_{c}") for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"}
-KEYBOARD_INDICATOR_KEYS = {
-    ecodes.KEY_ENTER,
-    ecodes.KEY_UP,
-    ecodes.KEY_DOWN,
-    ecodes.KEY_LEFT,
-    ecodes.KEY_RIGHT,
-    ecodes.KEY_BACK,
-    ecodes.KEY_HOME,
-    ecodes.KEY_MENU,
-}
-MOUSE_KEYS = {ecodes.BTN_LEFT, ecodes.BTN_RIGHT, ecodes.BTN_MIDDLE}
-KEYBOARD_NAME_RE = re.compile(r"\bkeyboard\b", re.IGNORECASE)
-
-# DEVICE_OVERRIDES: list[tuple[re.Pattern, str]] = [
-#     (re.compile(r"BOXPUT.*BPR1 Keyboard", re.IGNORECASE), "remote"),
-# ]
-
-
-def kbd_type(device: InputDevice) -> str:
-    # for pattern, kind in DEVICE_OVERRIDES:
-    #     if pattern.search(device.name):
-    #         return kind
-
-    caps = device.capabilities()
-
-    if ecodes.EV_KEY not in caps:
-        return "other"
-
-    keys = set(caps[ecodes.EV_KEY])
-
-    # Мышь: кнопки мыши + относительные оси
-    if MOUSE_KEYS & keys and ecodes.EV_REL in caps:
-        return "mouse"
-
-    has_alpha = ALPHA_KEYS.issubset(keys)
-    has_leds = ecodes.EV_LED in caps  # Caps/Num/Scroll Lock
-
-    # Полноценная клавиатура: буквы + индикаторы
-    if has_alpha and has_leds:
-        return "full"
-    # Буквы есть, но нет LED — composite/remote
-    if has_alpha and not has_leds:
-        return "remote"
-    # Навигация без EV_ABS — пульт
-    if KEYBOARD_INDICATOR_KEYS & keys and ecodes.EV_ABS not in caps:
-        return "remote"
-    # Fallback по имени
-    if KEYBOARD_NAME_RE.search(device.name) and keys:
-        return "remote"
-
-    return "other"
-
-
-def idev_get_keyboards() -> list[InputDevice]:
-    return [dev for dev in idev_get_connected_devs() if kbd_type(dev) in ("full", "remote")]
-
-
-def idev_get_dev_by_uniq(uniq: str) -> Optional[InputDevice]:
-    devs = idev_get_connected_devs()
-    matched = [dev for dev in devs if dev.uniq.upper() == uniq.upper() and is_remote_ctrl(dev)]
-    return matched[0] if matched else None
+def idev_get_connected_kbds(uniqs: list[str] | None = None) -> list[InputDevice]:
+    """Use in asyc:
+    1. connected_hid_devs = await asyncio.to_thread(idev_get_connected_kbds)
+    2. connected_hid_devs = await asyncio.to_thread(lambda: idev_get_connected_kbds(['11:2a:3b:44:55:6c', 'F1:ba:3b:41:52:6e']))
+    """
+    result = []
+    _uniqs = [u.lower() for u in uniqs] if uniqs else []
+    for path in list_devices():
+        try:
+            dev = InputDevice(path)
+            if has_keys(dev):
+                if uniqs:
+                    if dev.uniq.lower() in _uniqs:
+                        result.append(dev)
+                    else:
+                        dev.close()
+                else:
+                    result.append(dev)
+            else:
+                dev.close()
+        except (OSError, PermissionError):
+            continue
+    return result
 
 
 def get_connected_input_devices() -> List[Dict[str, Any]]:
@@ -275,27 +238,77 @@ if __name__ == "__main__":
     # print_dicts_list(devs)
     # dbg(f"---------------------------------------------")  # //Dima
     # exit()
-    # devs = idev_get_dev_by_uniq("40:B4:cd:CE:31:d6")
+    # devs = idev_kbd_get_by_uniq("40:B4:cd:CE:31:d6")
     # print(f"devs: {devs}")
     # exit()
+    # monitored_devs = [
+    #     "40:b4:cd:ce:31:d6",  # Amazon Fire TV Remote
+    #     "ff:23:05:30:30:8c",  # HID Remote01
+    #     "c1:03:01:5a:02:95",  # BOXPUT BPR1 c1:03:01:5c:02:95
+    # ]
 
-    devs = idev_get_by_field("Name", "Keychron Keychron K5")
-    if devs:
-        for dev in devs:
-            dbg(f"dev: {dev.__dict__}")  # //Dima
+    for dev in idev_get_connected_kbds():
+        print(f"{dev.path:<18} | {dev.name}")
 
-    devs = idev_get_by_field(field="Uniq", field_value="40:b4:cd:ce:31:d6")
-    # print(repr(f"dev: {dev.__dict__}"))
-    if devs:
-        dev = devs[0]
-        dbg(f"Input dev: {dev.__dict__}")
+    import asyncio
+    import functools
 
-        key = idev_key_monitor(dev.event)
-        dbg(f"Pressed key: {key.__dict__}")
+    async def test_idev_get_connected_kbds(
+        uniqs: list[str] | None = None,
+    ) -> list[InputDevice]:
+        return await asyncio.to_thread(lambda: idev_get_connected_kbds(uniqs))
 
-        key = asyncio.run(idev_get_pressed_key(dev.event))
-        if key:
-            dbg(f"Pressed key: {key}")
-            dbg(f"Pressed key: {key.__dict__}")
+    async def testA_idev_get_connected_kbds(
+        uniqs: list[str] | None = None,
+    ) -> list[InputDevice]:
+        return await asyncio.to_thread(functools.partial(idev_get_connected_kbds, uniqs))
+
+    async def test2_idev_get_connected_kbds() -> list[InputDevice]:
+        return await asyncio.get_running_loop().run_in_executor(None, idev_get_connected_kbds)
+
+    print("-" * 65)
+    con_devs = asyncio.run(test_idev_get_connected_kbds())
+    print(f"con_devs: {[dev.name for dev in con_devs]}")
+    print("-" * 55)
+    con_devs = asyncio.run(test2_idev_get_connected_kbds())
+    print(f"con_devs: {[dev.name for dev in con_devs]}")
+    print("-" * 55)
+    con_devs = asyncio.run(
+        testA_idev_get_connected_kbds(uniqs=["40:b4:cd:ce:31:d6", "c1:03:01:5c:02:95"])
+    )
+    print(f"con_devs: {[(dev.name, dev.uniq) for dev in con_devs]}")
+    """
+    https://claude.ai/share/342dbe4e-3eff-4732-8249-bd68837c6fba
+       Oба варианта корректны и делают одно и то же. Разница чисто косметическая:
+    asyncio.to_thread — это обёртка над run_in_executor(None, ...),
+    добавленная в Python 3.9 именно чтобы не писать get_running_loop() вручную.
+    Используй to_thread — он чище и современнее.
+    run_in_executor оставь для случаев когда нужен кастомный executor (например ThreadPoolExecutor с лимитом потоков).
+    
+       Передача параметров:
+    await asyncio.to_thread(
+        lambda: idev_get_connected_kbds(uniqs=["aa:bb:cc:dd:ee:ff"])
+    )
+    import functools
+    await asyncio.to_thread(functools.partial(idev_get_connected_kbds, uniqs=["aa:bb:cc:dd:ee:ff"]))
+    """
+    # devs = idev_get_by_field("Name", "Keychron Keychron K5")
+    # if devs:
+    #     for dev in devs:
+    #         dbg(f"dev: {dev.__dict__}")  # //Dima
+
+    # devs = idev_get_by_field(field="Uniq", field_value="40:b4:cd:ce:31:d6")
+    # # print(repr(f"dev: {dev.__dict__}"))
+    # if devs:
+    #     dev = devs[0]
+    #     dbg(f"Input dev: {dev.__dict__}")
+
+    #     key = idev_key_monitor(dev.event)
+    #     dbg(f"Pressed key: {key.__dict__}")
+
+    #     key = asyncio.run(idev_get_pressed_key(dev.event))
+    #     if key:
+    #         dbg(f"Pressed key: {key}")
+    #         dbg(f"Pressed key: {key.__dict__}")
 
     dbg(" == FINISH ==")  # //Dima

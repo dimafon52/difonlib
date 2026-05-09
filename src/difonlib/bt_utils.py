@@ -170,19 +170,20 @@ def bt_scan_hid_devs() -> list:
     return hid_devs
 
 
-async def bt_scan_devs(  # universally version for classic and ble devices
+# Universal Bluetooth scanner for classic and BLE devices.
+async def bt_scan_devs(
     dev_type: str = "HID Device",
-    inquiry_warmup: float = 4.0,  # время для Classic Inquiry
-    scan_duration: float = 4.0,  # время bleak сканирования
+    scan_duration_classic: float = 4.0,  # scan time for Classic Inquiry
+    scan_duration_ble: float = 4.0,  # scan time for BLE devs
     adapter_path: str = "/org/bluez/hci0",
 ) -> list[dict]:
     bus = pydbus.SystemBus()
     adapter = bus.get("org.bluez", adapter_path)
     adapter.SetDiscoveryFilter({})
     adapter.StartDiscovery()
-    await asyncio.sleep(inquiry_warmup)
+    await asyncio.sleep(scan_duration_classic)
     try:
-        bt_scanner = BluetoothScanner(duration=scan_duration, dev_type=dev_type)
+        bt_scanner = BluetoothScanner(duration=scan_duration_ble, dev_type=dev_type)
         bt_devices = await bt_scanner.run()
     except Exception as e:
         print(f"  Bluetooth scan failed: {e}")

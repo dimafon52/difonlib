@@ -2,6 +2,8 @@
 # Makefile for difonlib
 # ==========================
 
+.PHONY: % add remove add-tool remove-tool test build clean fix lint format-check typecheck info update deps
+
 all: setup check-all test
 setup: clean .setup 
 # Все проверки: стиль, типы, тесты
@@ -13,12 +15,18 @@ info:
 	uv tree
 
 # Use make add pkg=package-name
-add: 
-	uv add "$(pkg)"
+add:
+	uv add $(filter-out $@, $(MAKECMDGOALS))
+
+remove:
+	uv remove $(filter-out $@, $(MAKECMDGOALS)) 
 
 # Use make add-tool pkg=package-name
 add-tool:
-	uv add --dev "$(pkg)"
+	uv add --dev $(filter-out $@, $(MAKECMDGOALS))
+
+remove-tool:
+	uv remove $(filter-out $@, $(MAKECMDGOALS)) --group dev
 
 # Создание виртуального окружения и установка зависимостей
 .setup:
@@ -82,3 +90,6 @@ publish:
 publish-test:
 	uv publish --repository testpypi --token $${PYPI_TOKEN}
 
+### https://claude.ai/share/045cde6b-f7ed-4e15-a9b3-0c650c702784
+%:
+	@true

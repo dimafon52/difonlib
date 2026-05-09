@@ -1,6 +1,6 @@
 [project]
 name = "difonlib"
-version = "0.3.1"
+version = "0.3.2"
 description = "python libraries"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -51,6 +51,7 @@ dev = [
     "types-pexpect>=4.9.0.20250916",
     "types-PyYAML>=6.0.12.20250915",
     "types-xmltodict>=1.0.1.20250920",
+    "ipython>=8.39.0",
 ]
 
 [tool.ruff]
