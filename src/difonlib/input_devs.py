@@ -142,7 +142,7 @@ def idev_get_by_field(field: str, field_value: str) -> Optional[List[IDevKbd]]:
     return kdevs
 
 
-def idev_key_monitor(dev_event: str) -> Optional[IDevKbdKey]:
+def idev_key_monitor(dev_path: str) -> Optional[IDevKbdKey]:
     """
     Wait for any pressed key on dev_event
     Return: ( key_event.scancode, hold_time, key_event.keycode )"""
@@ -150,9 +150,9 @@ def idev_key_monitor(dev_event: str) -> Optional[IDevKbdKey]:
     press_time: float | None = None  # timer key down timestamp
     key: IDevKbdKey | None = None
 
-    dev = InputDevice(f"/dev/input/{dev_event}")
+    dev = InputDevice(dev_path)
     dbg(f"Listening on: {dev.name}")
-
+    dev.grab()  # capture input device
     for event in dev.read_loop():
         # if event.type == ecodes.EV_KEY:
         key_event = categorize(event)
@@ -173,17 +173,19 @@ def idev_key_monitor(dev_event: str) -> Optional[IDevKbdKey]:
                 else key_event.keycode[0]
             )
             break
+    dev.ungrab()
     dev.close()
     return key
 
 
-async def idev_get_pressed_key(dev_event: str, timeout: int = 5) -> Optional[IDevKbdKey]:
+async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDevKbdKey]:
     """
     Wait timeout seconds for pressed key on dev_event
     """
-    dev = InputDevice(f"/dev/input/{dev_event}")
+    dev = InputDevice(dev_path)
     dbg(f" - Listening on: {dev.name}")
     # key = await _get_first_key_event(dev)
+    dev.grab()
     try:
         # asyncio.wait_for ограничивает выполнение асинхронной задачи по времени
         key = await asyncio.wait_for(
@@ -201,6 +203,7 @@ async def idev_get_pressed_key(dev_event: str, timeout: int = 5) -> Optional[IDe
         print(f" =!= Error: {e}")
 
     finally:
+        dev.ungrab()
         dev.close()
     return None
 
