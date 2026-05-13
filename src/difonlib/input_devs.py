@@ -43,7 +43,7 @@ def has_keys(dev: InputDevice) -> bool:
         ecodes.KEY_DOWN,
         ecodes.KEY_LEFT,
         ecodes.KEY_RIGHT,
-        # ecodes.KEY_OK,
+        ecodes.KEY_OK,
         # ecodes.KEY_SELECT,
         # ecodes.KEY_BACK,
         # ecodes.KEY_PLAYPAUSE,

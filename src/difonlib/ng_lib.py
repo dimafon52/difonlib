@@ -151,4 +151,5 @@ class CardTable:
             self.confirm_dialog.open()
 
         btn.on_click(handle_click)
+        setattr(self, f"btn{btn_txt}", btn)
         return btn
