@@ -29,10 +29,6 @@ class IDevKbdKey:
     keycode: str | tuple = ""
 
 
-def idev_get_connected_devs() -> List[InputDevice]:
-    return [InputDevice(p) for p in list_devices()]
-
-
 def has_keys(dev: InputDevice) -> bool:
     caps = dev.capabilities()
     if ecodes.EV_KEY not in caps:
@@ -57,29 +53,70 @@ def has_keys(dev: InputDevice) -> bool:
     return bool(remote_keys & keys)
 
 
-def idev_get_connected_kbds(uniqs: list[str] | None = None) -> list[InputDevice]:
+NOT_KBD_KEYWORDS = [
+    "mouse",
+    "hd-audio",
+    "headset",
+    "headphone",
+    "system control",
+    "video bus",
+    "power button",
+    "avrcp",
+]
+
+
+def keyboard_like(dev: Dict[str, Any]) -> bool:
+    # /proc/bus/input/devices
+    name = dev["Name"].lower()
+    handlers = dev["Handlers"].lower()
+    kw_in_name = any(kw in name for kw in NOT_KBD_KEYWORDS)
+    kw_handlers = any(kw in handlers for kw in NOT_KBD_KEYWORDS)
+    return not kw_in_name and not kw_handlers
+
+
+def get_kbd_like_devs() -> list[str]:
+    return [
+        f"/dev/input/{re.findall(r"event\d+", dev['Handlers'])[0]}"
+        for dev in get_connected_input_devices()
+        if keyboard_like(dev)
+    ]
+
+
+def idev_get_kbd(dev_name: str, dev_uniq: str) -> InputDevice | None:
+    connected_kbds = idev_get_connected_kbds([dev_uniq])
+    for kbd in connected_kbds:
+        if kbd.name == dev_name:
+            return kbd
+    return None
+
+
+def idev_get_connected_kbds(
+    uniqs: list[str] | None = None, carefully: bool = False
+) -> list[InputDevice]:
     """Use in asyc:
     1. connected_hid_devs = await asyncio.to_thread(idev_get_connected_kbds)
-    2. connected_hid_devs = await asyncio.to_thread(lambda: idev_get_connected_kbds(['11:2a:3b:44:55:6c', 'F1:ba:3b:41:52:6e']))
+    2. connected_hid_devs = await asyncio.to_thread(lambda: idev_get_connected_kbds(['11:2a:3b:44:55:6c', 'F1:ba:3B:41:52:6e']))
     """
-    result = []
+    connected_kbds = []
     _uniqs = [u.lower() for u in uniqs] if uniqs else []
-    for path in list_devices():
+    devs_list = get_kbd_like_devs() if carefully else list_devices()
+
+    for path in devs_list:
         try:
             dev = InputDevice(path)
             if has_keys(dev):
                 if uniqs:
                     if dev.uniq.lower() in _uniqs:
-                        result.append(dev)
+                        connected_kbds.append(dev)
                     else:
                         dev.close()
                 else:
-                    result.append(dev)
+                    connected_kbds.append(dev)
             else:
                 dev.close()
         except (OSError, PermissionError):
             continue
-    return result
+    return connected_kbds
 
 
 def get_connected_input_devices() -> List[Dict[str, Any]]:
