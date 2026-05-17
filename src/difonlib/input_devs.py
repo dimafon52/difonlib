@@ -82,11 +82,14 @@ def get_kbd_like_devs() -> list[str]:
     ]
 
 
-def idev_get_kbd(dev_name: str, dev_uniq: str) -> InputDevice | None:
-    connected_kbds = idev_get_connected_kbds([dev_uniq])
-    for kbd in connected_kbds:
-        if kbd.name == dev_name:
-            return kbd
+def idev_get_dev(dev_name: str, dev_uniq: str) -> InputDevice | None:
+    dev_path = [
+        f"/dev/input/{re.findall(r"event\d+", dev['Handlers'])[0]}"
+        for dev in get_connected_input_devices()
+        if dev["Name"] == dev_name and dev["Uniq"].lower() == dev_uniq.lower()
+    ]
+    if dev_path:
+        return InputDevice(dev_path[0])
     return None
 
 
