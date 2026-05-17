@@ -381,6 +381,7 @@ def btctl_dev_remove(mac_address: str) -> bool:
     prompt = r"\[.*\][#>]"
     # dev_info = {}
     # response = ""
+    dbg(f" === REMOVE DEVICE: '{mac_address}' ===")
     try:
         btctl = pexpect.spawn("bluetoothctl", encoding="utf-8")
         # btctl.logfile_read = sys.stdout
@@ -390,9 +391,10 @@ def btctl_dev_remove(mac_address: str) -> bool:
         ### REMOVE DEVICE (RECONNECT)
         btctl.sendline(f"remove {mac_address}")
         btctl.expect(prompt, timeout=3)
+        dbg(f" === REMOVE DEVICE: '{mac_address}' SUCCESSFUL ===")
         return True
     except Exception as e:
-        print(f" =!= Error: {e}")
+        print(f" =!= REMOVE DEVICE '{mac_address}' ERROR: {e}")
         return False
 
 
