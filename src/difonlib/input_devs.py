@@ -218,30 +218,27 @@ def idev_key_monitor(dev_path: str) -> Optional[IDevKbdKey]:
     return key
 
 
-async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDevKbdKey]:
+async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDevKbdKey | OSError]:
     """
     Wait timeout seconds for pressed key on dev_event
     """
     dev = InputDevice(dev_path)
     dbg(f" - Listening on: {dev.name}")
-    # key = await _get_first_key_event(dev)
     dev.grab()
     try:
-        # asyncio.wait_for ограничивает выполнение асинхронной задачи по времени
         key = await asyncio.wait_for(
-            # Вложенная функция, которая читает loop и возвращает первое событие
             _get_first_key_event(dev),
             timeout=timeout,
         )
         return key
+    except OSError as e:
+        print(f"❌ {e}")
+        return e
     except asyncio.CancelledError:
         print(" =!= idev_get_pressed_key cancelled")
         raise
-    except asyncio.TimeoutError:
-        print(f" =!= Timeout ({timeout} sec)")
     except Exception as e:
         print(f" =!= Error: {e}")
-
     finally:
         dev.ungrab()
         dev.close()

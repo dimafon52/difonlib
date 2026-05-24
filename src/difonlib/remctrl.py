@@ -83,14 +83,16 @@ class RemoteControls:
         """
         pass
 
-    async def get_pressed_button(self, dev_event: str, timeout: int = 7) -> Optional[IDevKbdKey]:
+    async def get_pressed_button(
+        self, dev_event: str, timeout: int = 7
+    ) -> Optional[IDevKbdKey | OSError]:
         key = await idev_get_pressed_key(dev_event, timeout=timeout)
         dbg(f" * Pressed KEY: {key}")  # //Dima
         return key
 
     async def learn_button(
         self, idev_name: str, idev_event: str, func_key: str, timeout: int = 10
-    ) -> Optional[IDevKbdKey]:
+    ) -> Optional[IDevKbdKey | OSError]:
         # dbg(f"self.cfg_func_keys: {self.cfg_func_keys}")  # //Dima
         if func_key not in self.cfg_func_keys:
             print(f" =!= func_key: '{func_key}' is not exist")
@@ -102,7 +104,7 @@ class RemoteControls:
         # idev_event = idev["event"]
         key = await idev_get_pressed_key(idev_event, timeout=timeout)
         dbg(f" * Pressed KEY: {key}")  # //Dima
-        if key:
+        if key and isinstance(key, IDevKbdKey):
             key_scan_code = key.scancode
             if key.hold_time > KEY_LONG_PRESSED_TIME:
                 key_scan_code += KEY_LONG_PRESSED_CONST
