@@ -218,7 +218,7 @@ def idev_key_monitor(dev_path: str) -> Optional[IDevKbdKey]:
     return key
 
 
-async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDevKbdKey | OSError]:
+async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDevKbdKey]:
     """
     Wait timeout seconds for pressed key on dev_event
     """
@@ -231,9 +231,9 @@ async def idev_get_pressed_key(dev_path: str, timeout: int = 5) -> Optional[IDev
             timeout=timeout,
         )
         return key
-    except OSError as e:
-        print(f"❌ {e}")
-        return e
+    # except OSError as e:
+    #     print(f"❌ {e}")
+    #     return e
     except asyncio.CancelledError:
         print(" =!= idev_get_pressed_key cancelled")
         raise
