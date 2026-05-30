@@ -8,7 +8,7 @@ Option 1 (old):
        ./docker_android_emulator.sh
      
 Option 2 (new, full automation):  
-       uv run get_tuya_preferences.py
+       uv run get_tuya_preferences.py --email dima.development@gmail.com --password qwerty123
        
 https://claude.ai/share/9eedea28-1cae-479e-b04e-e79e4b87b193
 

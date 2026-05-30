@@ -1,8 +1,44 @@
 #!/usr/bin/env python3
 """
 tuya_get_config.py
-Автоматический запуск TuyaSmartLife в Android-эмуляторе (Docker),
-логин через uiautomator2 и извлечение shared_prefs/preferences_global_key*.xml
+~~~~~~~~~~~~~~~~~~
+Полностью автоматическое извлечение конфигурационного файла Tuya SmartLife.
+
+Алгоритм:
+  1. Поднимает Android-эмулятор в Docker-контейнере (budtmo/docker-android).
+  2. Подключается к эмулятору через ADB и ждёт полной загрузки Android.
+  3. Устанавливает APK Tuya SmartLife.
+  4. Автоматически логинится в приложение через uiautomator2 (UI-автоматизация
+     поверх ADB — без VNC, без участия человека).
+  5. Извлекает файл shared_prefs/preferences_global_key*.xml, в котором
+     хранятся local_key устройств, токены и региональный endpoint.
+  6. Останавливает контейнер.
+
+Зависимости:
+  pip install uiautomator2
+
+Использование:
+  python3 tuya_get_config.py --email YOUR@EMAIL --password YOUR_PASS
+  python3 tuya_get_config.py --email YOUR@EMAIL --password YOUR_PASS --country Israel
+  python3 tuya_get_config.py --email YOUR@EMAIL --password YOUR_PASS --no-docker
+  python3 tuya_get_config.py --email YOUR@EMAIL --password YOUR_PASS --keep-docker
+
+Аргументы:
+  --email       Логин аккаунта Tuya / SmartLife
+  --password    Пароль аккаунта
+  --country     Название страны для выбора кода (+X) на экране логина
+                (default: Israel)
+  --no-docker   Пропустить запуск/остановку Docker — контейнер уже запущен
+  --keep-docker Не останавливать контейнер после завершения (удобно для отладки)
+
+Отладка:
+  При любой ошибке UI скрипт сохраняет скриншот (.png) и дамп иерархии
+  виджетов (.xml) в текущую директорию. Имена файлов соответствуют шагу:
+    tuya_01_start.png/xml        — стартовый экран приложения
+    tuya_02_login_screen.png/xml — экран ввода логина/пароля
+    tuya_03_filled.png/xml       — заполненная форма перед нажатием Log in
+    tuya_04_after_login.png/xml  — состояние после попытки входа
+    tuya_err_*.png/xml           — экран в момент конкретной ошибки
 """
 
 import subprocess
@@ -11,105 +47,125 @@ import sys
 import os
 import glob
 import argparse
+from typing import Any
 
 # ── Зависимости ──────────────────────────────────────────────────────────────
 try:
     import uiautomator2 as u2
 except ImportError:
-    print("[!] uiautomator2 не установлен: pip install uiautomator2")
+    print(" ⚠️ uiautymator2 не установлен: pip install uiautomator2")
     sys.exit(1)
 
-# ── Настройки ────────────────────────────────────────────────────────────────
+# ── Настройки ─────────────────────────────────────────────────────────────────
+# ADB подключается к эмулятору внутри Docker по TCP (порт проброшен на хост).
 ADB_HOST = "127.0.0.1"
 ADB_PORT = 5555
+
+# Docker-образ с предустановленным Android-эмулятором и поддержкой KVM.
 DOCKER_IMAGE = "budtmo/docker-android:emulator_11.0"
 CONTAINER_NAME = "android-arm-emulator-container"
+
+# Путь к APK на хосте (относительно рабочей директории).
 APK_PATH = "./apk/com.tuya.smartlife_3.6.1.apk"
+
+# Android package name приложения.
 PACKAGE = "com.tuya.smartlife"
+
+# Путь к shared_prefs внутри эмулятора (требует root — выдаётся автоматически).
 REMOTE_PREFS_DIR = f"/data/data/{PACKAGE}/shared_prefs"
+
+# Куда сохранять извлечённые файлы на хосте.
 OUTPUT_DIR = "./shared_prefs"
 
 
-# ── Утилиты ──────────────────────────────────────────────────────────────────
-def run(cmd, check=True, capture=False):
+# ── Низкоуровневые утилиты ───────────────────────────────────────────────────
+
+
+def run(cmd: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+    """Выполняет shell-команду с выводом в консоль.
+
+    Args:
+        cmd:     Команда для выполнения (передаётся в shell).
+        check:   Бросать CalledProcessError при ненулевом коде возврата.
+        capture: Перехватывать stdout/stderr вместо вывода на экран.
+
+    Returns:
+        CompletedProcess с полями returncode, stdout, stderr.
+    """
     print(f"  $ {cmd}")
-    kwargs = dict(shell=True, check=check)
+    text = None
     if capture:
-        kwargs.update(capture_output=True, text=True)
-    return subprocess.run(cmd, **kwargs)
+        text = True
+    return subprocess.run(cmd, text=text, shell=True, check=check, capture_output=capture)
 
 
-def adb(cmd, capture=False, check=True):
+def adb(cmd: str, capture: bool = False, check: bool = True) -> subprocess.CompletedProcess:
+    """Обёртка над run() — добавляет '-s HOST:PORT' для точного выбора устройства.
+
+    Использование явного -s обязательно когда на хосте несколько ADB-устройств
+    (физические телефоны, другие эмуляторы), иначе adb падает с
+    'more than one device/emulator'.
+    """
     return run(f"adb -s {ADB_HOST}:{ADB_PORT} {cmd}", capture=capture, check=check)
 
 
-def wait_boot(timeout=120):
-    """Ждём полной загрузки Android."""
+def wait_boot(timeout: int = 120) -> None:
+    """Блокирует выполнение до полной загрузки Android.
+
+    Опрашивает системное свойство sys.boot_completed каждые 3 секунды.
+    Свойство принимает значение '1' когда все системные сервисы запущены
+    и устройство готово к работе.
+
+    Raises:
+        TimeoutError: Если Android не загрузился за timeout секунд.
+    """
     print("[*] Ожидание загрузки Android...")
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout
+    # while time.monotonic() < deadline:
+    while time.monotonic() < deadline:
         r = adb("shell getprop sys.boot_completed", capture=True)
         if r.returncode == 0 and r.stdout.strip() == "1":
             print("[+] Android загружен.")
-            return True
+            return
         time.sleep(3)
     raise TimeoutError("Android не загрузился за отведённое время.")
 
 
-def wait_package(pkg, timeout=60):
-    """Ждём появления пакета в системе."""
+def wait_package(pkg: str, timeout: int = 60) -> None:
+    """Ждёт появления пакета в списке установленных приложений.
+
+    После успешного 'adb install' пакет не сразу виден через pm list packages —
+    нужно подождать регистрации в Package Manager.
+
+    Raises:
+        TimeoutError: Если пакет не появился за timeout секунд.
+    """
     print(f"[*] Ожидание пакета {pkg}...")
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         r = adb(f"shell pm list packages {pkg}", capture=True)
         if pkg in r.stdout:
             print(f"[+] Пакет {pkg} найден.")
-            return True
+            return
         time.sleep(3)
     raise TimeoutError(f"Пакет {pkg} не появился.")
 
 
-# ── Шаги ─────────────────────────────────────────────────────────────────────
-def start_docker():
-    print("\n[1/6] Запуск Docker-контейнера...")
-    run(f"docker container stop {CONTAINER_NAME}", check=False)
-    time.sleep(2)
-    run(
-        f"docker run --rm --privileged -d "
-        f"-p 6080:6080 -p {ADB_PORT}:{ADB_PORT} "
-        f"-e EMULATOR_DEVICE='Samsung Galaxy S10' "
-        f"-e WEB_VNC=true "
-        f"--device /dev/kvm "
-        f"--name {CONTAINER_NAME} "
-        f"{DOCKER_IMAGE}"
-    )
-    time.sleep(15)  # время на старт Docker
+# ── UI-утилиты (uiautomator2) ─────────────────────────────────────────────────
 
 
-def connect_adb():
-    print("\n[2/6] Подключение ADB...")
-    run("adb kill-server", check=False)
-    time.sleep(1)
-    run("adb start-server")
-    time.sleep(1)
-    run(f"adb connect {ADB_HOST}:{ADB_PORT}")
-    wait_boot()
-    adb("root", check=False)  # всегда через -s, игнорируем ошибку если уже root
-    time.sleep(2)
-    run(f"adb connect {ADB_HOST}:{ADB_PORT}")  # переподключение после root
+def dump_ui(d: u2.Device, label: str = "ui_dump") -> None:
+    """Сохраняет скриншот и XML-дамп иерархии UI для диагностики.
 
+    Скриншот снимается через 'adb shell screencap' (надёжнее чем
+    uiautomator2.screenshot, который требует записи в /data/local/tmp).
+    XML-дамп получается через d.dump_hierarchy() и сразу печатает все
+    текстовые метки на экране — удобно для подбора локаторов.
 
-def install_apk():
-    print("\n[3/6] Установка APK...")
-    if not os.path.exists(APK_PATH):
-        raise FileNotFoundError(f"APK не найден: {APK_PATH}")
-    adb(f"install -r {APK_PATH}")
-    wait_package(PACKAGE)
-    time.sleep(3)
-
-
-def dump_ui(d, label="ui_dump"):
-    """Сохраняет скриншот + XML дамп UI для отладки."""
+    Args:
+        d:     Подключённое uiautomator2 устройство.
+        label: Префикс имён файлов (label.png, label.xml).
+    """
     try:
         remote_png = f"/data/local/tmp/{label}.png"
         adb(f"shell screencap -p {remote_png}", check=False)
@@ -122,6 +178,7 @@ def dump_ui(d, label="ui_dump"):
         xml = d.dump_hierarchy()
         with open(f"./{label}.xml", "w", encoding="utf-8") as f:
             f.write(xml)
+        # Быстрый просмотр всех текстов на экране прямо в консоли
         texts = _re.findall(r'text="([^"]+)"', xml)
         texts = [t for t in texts if t.strip()]
         print(f"  [dbg] {label} тексты: {texts[:25]}")
@@ -129,8 +186,21 @@ def dump_ui(d, label="ui_dump"):
         print(f"  [dbg] dump_hierarchy error: {e}")
 
 
-def click_if_exists(d, texts, timeout=5):
-    """Кликает первый найденный элемент из списка текстов. Возвращает True если нашёл."""
+def click_if_exists(d: u2.Device, texts: list, timeout: int = 5) -> bool:
+    """Кликает по первому найденному элементу из списка текстов.
+
+    Перебирает тексты в порядке приоритета — первый совпавший побеждает.
+    Используется для навигации по экранам с неизвестным заранее текстом кнопок
+    (разные версии приложения могут использовать разные формулировки).
+
+    Args:
+        d:       Устройство uiautomator2.
+        texts:   Список текстов кнопок в порядке приоритета.
+        timeout: Время ожидания каждого элемента в секундах.
+
+    Returns:
+        True если элемент найден и кликнут, False иначе.
+    """
     for t in texts:
         el = d(text=t)
         if el.exists(timeout=timeout):
@@ -141,10 +211,22 @@ def click_if_exists(d, texts, timeout=5):
     return False
 
 
-def wait_any(d, texts, timeout=30):
-    """Ждёт появления любого из текстов на экране. Возвращает найденный текст или None."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
+def wait_any(d: u2.Device, texts: list, timeout: int = 30) -> Any | None:
+    """Ждёт появления любого из перечисленных текстов на экране.
+
+    Используется как барьер синхронизации — ждём пока UI перейдёт
+    в ожидаемое состояние, не полагаясь на фиксированные sleep().
+
+    Args:
+        d:       Устройство uiautomator2.
+        texts:   Список текстов-маркеров нужного состояния экрана.
+        timeout: Максимальное время ожидания в секундах.
+
+    Returns:
+        Первый найденный текст, или None если ни один не появился.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
         for t in texts:
             if d(text=t).exists(timeout=0):
                 return t
@@ -152,21 +234,70 @@ def wait_any(d, texts, timeout=30):
     return None
 
 
-def set_field(d, hints, value, field_index=None):
-    """Вводит текст в поле по hint-тексту (placeholder) или по индексу EditText."""
+def adb_input_text(value: str) -> None:
+    """Вводит текст через 'adb shell input text'.
+
+    Предпочтительнее uiautomator2.set_text() для паролей: set_text использует
+    внутренний буфер обмена Android, который может искажать спецсимволы
+    (!, @, #, $, ...) в зависимости от раскладки клавиатуры эмулятора.
+    adb input text передаёт символы напрямую в InputMethod.
+
+    Args:
+        value: Текст для ввода. Экранируется через shlex.quote перед
+               передачей в shell.
+    """
+    import shlex
+
+    safe = shlex.quote(value)
+    adb(f"shell input text {safe}", check=False)
+
+
+def set_field(
+    d: u2.Device,
+    hints: list,
+    value: str,
+    field_index: "int | None" = None,
+    use_adb_input: bool = False,
+) -> bool:
+    """Находит поле ввода и вводит в него текст.
+
+    Стратегия поиска:
+      1. Ищет элемент с текстом-placeholder из списка hints (основной путь).
+         После клика по placeholder тот исчезает — переключается на
+         focused=True EditText для ввода.
+      2. Если placeholder не найден — fallback по индексу среди всех EditText
+         на экране (field_index=0 для первого поля, 1 для второго и т.д.).
+
+    Args:
+        d:             Устройство uiautomator2.
+        hints:         Тексты placeholder-ов в порядке приоритета.
+        value:         Значение для ввода.
+        field_index:   Индекс EditText как fallback (None = не использовать).
+        use_adb_input: Использовать adb_input_text вместо set_text
+                       (рекомендуется для паролей).
+
+    Returns:
+        True если поле найдено и заполнено, False иначе.
+    """
     for hint in hints:
         el = d(text=hint)
         if el.exists(timeout=3):
             print(f"  [ui] set_text field='{hint}'")
             el.click()
-            time.sleep(0.5)
-            # После клика placeholder исчезает — ищем активный EditText
+            time.sleep(0.8)
             active = d(focused=True, className="android.widget.EditText")
             if active.exists(timeout=3):
                 active.clear_text()
-                active.set_text(value)
+                time.sleep(0.3)
+                if use_adb_input:
+                    adb_input_text(value)
+                else:
+                    active.set_text(value)
             else:
-                el.set_text(value)
+                if use_adb_input:
+                    adb_input_text(value)
+                else:
+                    el.set_text(value)
             time.sleep(0.5)
             return True
     # Fallback по индексу
@@ -176,15 +307,115 @@ def set_field(d, hints, value, field_index=None):
         print(f"  [ui] EditText по индексу {field_index} (всего: {count})")
         if count > field_index:
             fields[field_index].click()
-            time.sleep(0.3)
+            time.sleep(0.5)
             fields[field_index].clear_text()
-            fields[field_index].set_text(value)
+            time.sleep(0.3)
+            if use_adb_input:
+                adb_input_text(value)
+            else:
+                fields[field_index].set_text(value)
             return True
     return False
 
 
-def login_tuya(email: str, password: str, country: str = "Israel"):
-    """Автоматический логин через uiautomator2."""
+# ── Основные шаги ─────────────────────────────────────────────────────────────
+
+
+def start_docker() -> None:
+    """Запускает Docker-контейнер с Android-эмулятором.
+
+    Сначала останавливает контейнер с тем же именем если он уже запущен
+    (check=False — не падать если контейнера нет).
+    Флаги запуска:
+      --rm          Автоматически удалить контейнер после остановки.
+      --privileged  Необходим для доступа к /dev/kvm (аппаратная виртуализация).
+      --device /dev/kvm  Пробрасывает KVM в контейнер для ускорения эмулятора.
+      -p 5555:5555  ADB TCP порт для подключения с хоста.
+      -p 6080:6080  VNC через браузер (для ручной отладки, не используется скриптом).
+    """
+    print("\n[1/6] Запуск Docker-контейнера...")
+    run(f"docker container stop {CONTAINER_NAME}", check=False)
+    time.sleep(2)
+    run(
+        f"docker run --rm --privileged -d "
+        f"-p 6080:6080 -p {ADB_PORT}:{ADB_PORT} "
+        f"-e EMULATOR_DEVICE='Samsung Galaxy S10' "
+        f"-e WEB_VNC=true "
+        f"--device /dev/kvm "
+        f"--name {CONTAINER_NAME} "
+        f"{DOCKER_IMAGE}"
+    )
+    time.sleep(15)  # Docker нужно время на старт до того как ADB сможет подключиться
+
+
+def connect_adb() -> None:
+    """Устанавливает ADB-соединение с эмулятором и получает root.
+
+    Последовательность:
+      1. kill-server / start-server — чистый старт ADB daemon на хосте.
+      2. adb connect — TCP-подключение к эмулятору.
+      3. wait_boot — ждём полной загрузки Android.
+      4. adb root — перезапускает adbd в контейнере от root.
+         Необходимо для доступа к /data/data/* (shared_prefs).
+         check=False — 'adbd is already running as root' возвращает код 1.
+      5. Повторный connect — после root adbd переподключается.
+    """
+    print("\n[2/6] Подключение ADB...")
+    run("adb kill-server", check=False)
+    time.sleep(1)
+    run("adb start-server")
+    time.sleep(1)
+    run(f"adb connect {ADB_HOST}:{ADB_PORT}")
+    wait_boot()
+    adb("root", check=False)
+    time.sleep(2)
+    run(f"adb connect {ADB_HOST}:{ADB_PORT}")
+
+
+def install_apk() -> None:
+    """Устанавливает APK Tuya SmartLife в эмулятор.
+
+    Флаг -r разрешает переустановку поверх существующей версии.
+    После установки ждём регистрации пакета в Package Manager.
+    """
+    print("\n[3/6] Установка APK...")
+    if not os.path.exists(APK_PATH):
+        raise FileNotFoundError(f"APK не найден: {APK_PATH}")
+    adb(f"install -r {APK_PATH}")
+    wait_package(PACKAGE)
+    time.sleep(3)
+
+
+def login_tuya(email: str, password: str, country: str = "Israel") -> None:
+    """Автоматически логинится в Tuya SmartLife через UI-автоматизацию.
+
+    Использует uiautomator2 — Python-библиотеку поверх ADB UIAutomator2 API.
+    Не требует VNC или физического доступа к экрану.
+
+    Полный flow экранов (версия APK 3.6.1):
+      [Стартовый экран]  Register | Log in with existing account
+           ↓ клик "Log in with existing account"
+      [Privacy Policy]   Disagree | Agree
+           ↓ клик "Agree"
+      [Loading...]
+           ↓ ждём появления полей ввода
+      [Экран логина]     страна (+X) | email | password | Log in
+           ↓ выбор страны → ввод email → ввод пароля → клик "Log in"
+      [Попап геолокации] While using the app | Only this time | Deny
+           ↓ клик "Deny"
+      [Главный экран]    My Home / All Devices  ← успех
+
+    Args:
+        email:    Email или номер телефона аккаунта Tuya.
+        password: Пароль аккаунта (вводится через adb input text для
+                  корректной обработки спецсимволов).
+        country:  Название страны для выбора кода (+X). Используется поиском
+                  на экране выбора страны.
+
+    Raises:
+        RuntimeError: При любой ошибке UI сохраняет диагностические файлы
+                      и бросает исключение с указанием на них.
+    """
     print("\n[4/6] Автологин в TuyaSmartLife...")
 
     d = u2.connect(f"{ADB_HOST}:{ADB_PORT}")
@@ -192,7 +423,7 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
 
     # ── Запуск приложения ────────────────────────────────────────────────────
     print("  [*] Запуск приложения...")
-    d.app_start(PACKAGE, stop=True)
+    d.app_start(PACKAGE, stop=True)  # stop=True — принудительно убить если было запущено
 
     # Ждём появления любого известного элемента стартового экрана
     first = wait_any(
@@ -213,14 +444,13 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
     if first is None:
         dump_ui(d, "tuya_start")
         raise RuntimeError(
-            "Приложение не показало стартовый экран. "
-            "Смотри tuya_start.png / tuya_start.xml"
+            "Приложение не показало стартовый экран. " "Смотри tuya_start.png / tuya_start.xml"
         )
 
     print(f"  [*] Первый элемент на экране: '{first}'")
-    dump_ui(d, "tuya_01_start")  # покажет все тексты на экране
+    dump_ui(d, "tuya_01_start")
 
-    # ── Кнопка входа на стартовом экране ────────────────────────────────────
+    # ── Переход на экран логина ───────────────────────────────────────────────
     clicked_login = click_if_exists(
         d,
         [
@@ -236,16 +466,18 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
     if not clicked_login:
         print("  [*] Кнопка входа не найдена — возможно уже на экране ввода")
 
-    # ── Privacy Policy может появиться в любой момент — ждём и принимаем ────
-    def accept_privacy_if_shown(d, timeout=15):
-        deadline = time.time() + timeout
-        while time.time() < deadline:
+    # ── Privacy Policy ────────────────────────────────────────────────────────
+    # Появляется асинхронно после клика — может показаться во время Loading...
+    # Ждём активно: как только появился "Agree" — кликаем и выходим из цикла.
+    # Выходим досрочно если уже виден экран логина (поле ввода или код страны).
+    def accept_privacy_if_shown(d: u2.Device, timeout: int = 15) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             if d(text="Agree").exists(timeout=0):
                 print("  [*] Privacy Policy — клик Agree")
                 d(text="Agree").click()
                 time.sleep(1)
                 return True
-            # Если уже на экране логина (есть поле ввода) — выходим
             if d(text="Mobile number/e-mail address").exists(timeout=0):
                 return False
             if d(textContains="+").exists(timeout=0):
@@ -255,7 +487,7 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
 
     accept_privacy_if_shown(d, timeout=20)
 
-    # Ждём окончания Loading... и появления экрана логина
+    # Ждём окончания Loading... — барьер перед вводом данных
     print("  [*] Ожидание экрана логина...")
     login_ready = wait_any(
         d,
@@ -268,37 +500,34 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
     )
     if not login_ready:
         dump_ui(d, "tuya_02_login_screen")
-        raise RuntimeError(
-            "Экран логина не появился. Смотри tuya_02_login_screen.png/xml"
-        )
+        raise RuntimeError("Экран логина не появился. Смотри tuya_02_login_screen.png/xml")
 
     dump_ui(d, "tuya_02_login_screen")
 
-    # ── Смена страны (USA +1 → нужная страна) ────────────────────────────────
+    # ── Выбор страны ─────────────────────────────────────────────────────────
+    # По умолчанию стоит "USA +1". Кликаем по строке с "+" → открывается
+    # список стран с поиском → вводим название → выбираем первый результат.
     if country:
         print(f"  [*] Смена страны на: {country}")
-        # Кликаем по строке с кодом страны (содержит "+")
         country_el = d(textContains="+")
         if country_el.exists(timeout=5):
             country_el.click()
             time.sleep(2)
-            # Экран выбора страны — ищем поле Search
             search = d(text="Search")
             if search.exists(timeout=5):
                 search.click()
                 time.sleep(0.5)
                 d(focused=True).set_text(country)
                 time.sleep(2)
-            # Кликаем первый результат
             results = d(className="android.widget.TextView", textContains=country)
             if results.exists(timeout=5):
                 results.click()
                 time.sleep(1.5)
             else:
-                d.press("back")  # отмена если не нашли
+                d.press("back")
                 print(f"  [!] Страна '{country}' не найдена, оставляем текущую")
 
-    # ── Ввод email / телефона ────────────────────────────────────────────────
+    # ── Ввод email ────────────────────────────────────────────────────────────
     print("  [*] Ввод email...")
     ok = set_field(
         d,
@@ -317,29 +546,34 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
         raise RuntimeError("Поле email не найдено. Смотри tuya_err_email.png/xml")
     time.sleep(0.5)
 
-    # ── Ввод пароля ──────────────────────────────────────────────────────────
+    # ── Ввод пароля ───────────────────────────────────────────────────────────
+    # use_adb_input=True — обход проблемы искажения спецсимволов через clipboard
     print("  [*] Ввод пароля...")
     ok = set_field(
-        d, hints=["Password", "Enter password"], value=password, field_index=1
+        d,
+        hints=["Password", "Enter password"],
+        value=password,
+        field_index=1,
+        use_adb_input=True,
     )
     if not ok:
         dump_ui(d, "tuya_err_password")
         raise RuntimeError("Поле пароля не найдено. Смотри tuya_err_password.png/xml")
 
-    d.press("back")  # скрыть клавиатуру
+    d.press("back")  # скрыть экранную клавиатуру перед нажатием кнопки
     time.sleep(0.5)
     dump_ui(d, "tuya_03_filled")
 
-    # ── Нажать Log in ─────────────────────────────────────────────────────────
+    # ── Нажатие кнопки Log in ─────────────────────────────────────────────────
+    # На экране два TextView с текстом "Log in": заголовок страницы (не кликабельный)
+    # и кнопка (clickable=True). Явный фильтр по clickable исключает заголовок.
     print("  [*] Нажатие кнопки входа...")
-    # На экране два элемента "Log in": заголовок (не кликабельный) и кнопка.
-    # Ищем именно кликабельную кнопку.
     btn = d(text="Log in", clickable=True)
     if btn.exists(timeout=10):
         print("  [ui] click: кнопка 'Log in' (clickable=True)")
         btn.click()
     else:
-        # Fallback: все Log in элементы — берём последний (кнопка внизу)
+        # Fallback: берём последний элемент с таким текстом (кнопка всегда ниже заголовка)
         els = d(text="Log in")
         count = els.count
         print(f"  [ui] Log in элементов: {count}, кликаем последний")
@@ -347,51 +581,64 @@ def login_tuya(email: str, password: str, country: str = "Israel"):
             els[count - 1].click()
         else:
             dump_ui(d, "tuya_err_submit")
-            raise RuntimeError(
-                "Кнопка входа не найдена. Смотри tuya_err_submit.png/xml"
-            )
+            raise RuntimeError("Кнопка входа не найдена. Смотри tuya_err_submit.png/xml")
 
-    # ── Попап геолокации и прочие разрешения ─────────────────────────────────
+    # ── Ожидание результата авторизации ──────────────────────────────────────
     print("  [*] Ожидание авторизации и попапов (60 сек)...")
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        # Успех — главный экран
-        if wait_any(d, ["My Home", "My home", "All Devices", "My Home"], timeout=2):
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        # Немедленно реагируем на ошибку — не ждём зря 60 секунд
+        if d(text="Incorrect account or password").exists(timeout=0):
+            dump_ui(d, "tuya_err_wrong_password")
+            raise RuntimeError(
+                "Неверный логин или пароль ('Incorrect account or password'). "
+                "Проверьте --email и --password."
+            )
+        # Успех — появился главный экран
+        if wait_any(d, ["My Home", "My home", "All Devices"], timeout=2):
             break
-        # Отклоняем попапы разрешений
+        # Отклоняем попап геолокации и другие системные разрешения
         click_if_exists(
             d,
             ["Deny", "Don't allow", "Only this time", "While using the app"],
             timeout=1,
         )
-        # Принимаем если нужно
         click_if_exists(d, ["OK", "Got it"], timeout=1)
 
     dump_ui(d, "tuya_04_after_login")
 
-    success_marker = wait_any(
-        d, ["My Home", "My home", "All Devices", "Smart", "Me", "My Home"], timeout=10
-    )
+    success_marker = wait_any(d, ["My Home", "My home", "All Devices", "Smart", "Me"], timeout=10)
     if success_marker:
         print(f"  [+] Авторизация успешна (маркер: '{success_marker}').")
     else:
         if wait_any(d, ["Log in", "Log In", "Login"], timeout=3):
-            raise RuntimeError(
-                "Авторизация не прошла. Смотри tuya_04_after_login.png/xml"
-            )
+            raise RuntimeError("Авторизация не прошла. Смотри tuya_04_after_login.png/xml")
         print("  [!] Маркер главного экрана не найден — продолжаем.")
 
-    time.sleep(15)  # даём время на сохранение shared_prefs на диск
+    # Даём приложению время записать конфиг на диск.
+    # shared_prefs сохраняются не мгновенно после логина.
+    time.sleep(15)
 
 
-def pull_prefs():
+def pull_prefs() -> list:
+    """Извлекает директорию shared_prefs из эмулятора на хост.
+
+    Использует 'adb pull' для копирования всей директории.
+    Ищет файл preferences_global_key*.xml — в нём хранятся
+    local_key устройств, токены сессии и региональный API endpoint.
+
+    Returns:
+        Список путей к найденным XML-файлам.
+
+    Raises:
+        FileNotFoundError: Если целевые файлы не найдены после pull.
+    """
     print("\n[5/6] Извлечение shared_prefs...")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     adb(f"pull {REMOTE_PREFS_DIR} {OUTPUT_DIR}")
 
     files = glob.glob(f"{OUTPUT_DIR}/**/preferences_global_key*.xml", recursive=True)
     if not files:
-        # Иногда pull кладёт в подпапку shared_prefs/shared_prefs
         files = glob.glob(f"{OUTPUT_DIR}/**/*.xml", recursive=True)
 
     if not files:
@@ -403,31 +650,36 @@ def pull_prefs():
     return files
 
 
-def stop_docker():
+def stop_docker() -> None:
+    """Останавливает Docker-контейнер с эмулятором."""
     print("\n[6/6] Остановка контейнера...")
     run(f"docker container stop {CONTAINER_NAME}", check=False)
     print("[+] Готово.")
 
 
 # ── Точка входа ───────────────────────────────────────────────────────────────
-def main():
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Автоматическое извлечение Tuya shared_prefs"
+        description="Автоматическое извлечение Tuya SmartLife конфигурации (local_key устройств)."
     )
-    parser.add_argument("--email", required=True, help="Tuya аккаунт email")
-    parser.add_argument("--password", required=True, help="Tuya пароль")
+    parser.add_argument("--email", required=True, help="Email или телефон аккаунта Tuya/SmartLife")
+    parser.add_argument("--password", required=True, help="Пароль аккаунта")
     parser.add_argument(
-        "--country", default="Israel", help="Страна для выбора (default: Israel)"
+        "--country",
+        default="Israel",
+        help="Страна для выбора кода (+X) на экране логина (default: Israel)",
     )
     parser.add_argument(
         "--no-docker",
         action="store_true",
-        help="Не запускать/останавливать Docker (контейнер уже запущен)",
+        help="Не запускать/останавливать Docker — контейнер уже запущен",
     )
     parser.add_argument(
         "--keep-docker",
         action="store_true",
-        help="Не останавливать Docker после завершения",
+        help="Не останавливать контейнер после завершения (удобно для отладки)",
     )
     args = parser.parse_args()
 
