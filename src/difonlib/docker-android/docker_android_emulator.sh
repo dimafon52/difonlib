@@ -28,7 +28,9 @@ sleep 20
 adb install -f ${PWD}/apk/com.tuya.smartlife_3.6.1.apk
 sleep 3
 
-echo "Run Tuya Smart Home application. To continue press ENTER"
+echo "Run Tuya Smart Home application"
+echo "  After all manipulation with Tuya Smart Home to continue - ⚠️close your internet browser(firefox)!"
+echo "   👉 To continue press ENTER"
 read
 firefox localhost:6080
 

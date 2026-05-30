@@ -52,6 +52,7 @@ dev = [
     "types-PyYAML>=6.0.12.20250915",
     "types-xmltodict>=1.0.1.20250920",
     "ipython>=8.39.0",
+    "uiautomator2>=3.5.2",
 ]
 
 [tool.ruff]
