@@ -1,6 +1,6 @@
 [project]
 name = "difonlib"
-version = "0.3.7"
+version = "0.3.8"
 description = "python libraries"
 readme = "README.md"
 requires-python = ">=3.12"
