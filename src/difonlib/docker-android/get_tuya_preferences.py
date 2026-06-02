@@ -47,7 +47,6 @@ import sys
 import os
 import glob
 import argparse
-from typing import Optional
 
 # ── Зависимости ──────────────────────────────────────────────────────────────
 try:
@@ -95,10 +94,12 @@ def run(
         CompletedProcess с полями returncode, stdout, stderr.
     """
     print(f"  $ {cmd}")
-    kwargs = dict(shell=True, check=check)
+    text = False
     if capture:
-        kwargs.update(capture_output=True, text=True)
-    return subprocess.run(cmd, **kwargs)
+        text = True
+    return subprocess.run(
+        cmd, shell=True, check=check, capture_output=capture, text=text
+    )
 
 
 def adb(
@@ -113,7 +114,7 @@ def adb(
     return run(f"adb -s {ADB_HOST}:{ADB_PORT} {cmd}", capture=capture, check=check)
 
 
-def wait_boot(timeout: int = 120) -> None:
+def wait_boot(timeout: int = 300) -> None:
     """Блокирует выполнение до полной загрузки Android.
 
     Опрашивает системное свойство sys.boot_completed каждые 3 секунды.
@@ -214,7 +215,7 @@ def click_if_exists(d: u2.Device, texts: list, timeout: int = 5) -> bool:
     return False
 
 
-def wait_any(d: u2.Device, texts: list, timeout: int = 30) -> Optional[str]:
+def wait_any(d: u2.Device, texts: list[str], timeout: int = 30) -> str | None:
     """Ждёт появления любого из перечисленных текстов на экране.
 
     Используется как барьер синхронизации — ждём пока UI перейдёт
@@ -348,7 +349,7 @@ def start_docker() -> None:
         f"--name {CONTAINER_NAME} "
         f"{DOCKER_IMAGE}"
     )
-    time.sleep(15)  # Docker нужно время на старт до того как ADB сможет подключиться
+    time.sleep(5)  # Docker нужно время на старт до того как ADB сможет подключиться
 
 
 def wait_port(host: str, port: int, timeout: int = 120) -> None:
