@@ -47,13 +47,13 @@ import sys
 import os
 import glob
 import argparse
-from typing import Any
+from typing import Optional
 
 # ── Зависимости ──────────────────────────────────────────────────────────────
 try:
     import uiautomator2 as u2
 except ImportError:
-    print(" ⚠️ uiautymator2 не установлен: pip install uiautomator2")
+    print("[!] uiautymator2 не установлен: pip install uiautomator2")
     sys.exit(1)
 
 # ── Настройки ─────────────────────────────────────────────────────────────────
@@ -81,7 +81,9 @@ OUTPUT_DIR = "./shared_prefs"
 # ── Низкоуровневые утилиты ───────────────────────────────────────────────────
 
 
-def run(cmd: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+def run(
+    cmd: str, check: bool = True, capture: bool = False
+) -> subprocess.CompletedProcess:
     """Выполняет shell-команду с выводом в консоль.
 
     Args:
@@ -93,13 +95,15 @@ def run(cmd: str, check: bool = True, capture: bool = False) -> subprocess.Compl
         CompletedProcess с полями returncode, stdout, stderr.
     """
     print(f"  $ {cmd}")
-    text = None
+    kwargs = dict(shell=True, check=check)
     if capture:
-        text = True
-    return subprocess.run(cmd, text=text, shell=True, check=check, capture_output=capture)
+        kwargs.update(capture_output=True, text=True)
+    return subprocess.run(cmd, **kwargs)
 
 
-def adb(cmd: str, capture: bool = False, check: bool = True) -> subprocess.CompletedProcess:
+def adb(
+    cmd: str, capture: bool = False, check: bool = True
+) -> subprocess.CompletedProcess:
     """Обёртка над run() — добавляет '-s HOST:PORT' для точного выбора устройства.
 
     Использование явного -s обязательно когда на хосте несколько ADB-устройств
@@ -121,9 +125,8 @@ def wait_boot(timeout: int = 120) -> None:
     """
     print("[*] Ожидание загрузки Android...")
     deadline = time.monotonic() + timeout
-    # while time.monotonic() < deadline:
     while time.monotonic() < deadline:
-        r = adb("shell getprop sys.boot_completed", capture=True)
+        r = adb("shell getprop sys.boot_completed", capture=True, check=False)
         if r.returncode == 0 and r.stdout.strip() == "1":
             print("[+] Android загружен.")
             return
@@ -211,7 +214,7 @@ def click_if_exists(d: u2.Device, texts: list, timeout: int = 5) -> bool:
     return False
 
 
-def wait_any(d: u2.Device, texts: list, timeout: int = 30) -> Any | None:
+def wait_any(d: u2.Device, texts: list, timeout: int = 30) -> Optional[str]:
     """Ждёт появления любого из перечисленных текстов на экране.
 
     Используется как барьер синхронизации — ждём пока UI перейдёт
@@ -348,40 +351,117 @@ def start_docker() -> None:
     time.sleep(15)  # Docker нужно время на старт до того как ADB сможет подключиться
 
 
+def wait_port(host: str, port: int, timeout: int = 120) -> None:
+    """Ждёт открытия TCP-порта — признак готовности ADB в контейнере.
+
+    Docker поднимает эмулятор асинхронно: контейнер стартует быстро,
+    но ADB-порт открывается только когда QEMU и adbd внутри готовы.
+    Фиксированный sleep(15) ненадёжен на медленных машинах.
+
+    Raises:
+        TimeoutError: Если порт не открылся за timeout секунд.
+    """
+    import socket
+
+    print(f"[*] Ожидание TCP {host}:{port}...")
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                print(f"[+] Порт {port} открыт.")
+                return
+        except OSError:
+            time.sleep(2)
+    raise TimeoutError(f"Порт {host}:{port} не открылся за {timeout} сек.")
+
+
 def connect_adb() -> None:
     """Устанавливает ADB-соединение с эмулятором и получает root.
 
     Последовательность:
       1. kill-server / start-server — чистый старт ADB daemon на хосте.
-      2. adb connect — TCP-подключение к эмулятору.
-      3. wait_boot — ждём полной загрузки Android.
-      4. adb root — перезапускает adbd в контейнере от root.
+      2. wait_port — ждём реального открытия TCP-порта (надёжнее sleep).
+      3. adb connect — TCP-подключение, повторяем до успеха.
+      4. wait_boot — ждём полной загрузки Android.
+      5. adb root — перезапускает adbd в контейнере от root.
          Необходимо для доступа к /data/data/* (shared_prefs).
          check=False — 'adbd is already running as root' возвращает код 1.
-      5. Повторный connect — после root adbd переподключается.
+      6. Повторный connect — после root adbd переподключается.
     """
     print("\n[2/6] Подключение ADB...")
     run("adb kill-server", check=False)
     time.sleep(1)
     run("adb start-server")
-    time.sleep(1)
-    run(f"adb connect {ADB_HOST}:{ADB_PORT}")
+
+    # Ждём реального открытия порта — не полагаемся на sleep
+    wait_port(ADB_HOST, ADB_PORT, timeout=120)
+
+    # adb connect может не сработать с первого раза — повторяем
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        r = run(f"adb connect {ADB_HOST}:{ADB_PORT}", capture=True, check=False)
+        if "connected" in r.stdout and "failed" not in r.stdout:
+            break
+        print("  [*] Повтор adb connect...")
+        time.sleep(3)
+    else:
+        raise RuntimeError(f"Не удалось подключиться к {ADB_HOST}:{ADB_PORT}")
+
     wait_boot()
     adb("root", check=False)
     time.sleep(2)
-    run(f"adb connect {ADB_HOST}:{ADB_PORT}")
+    run(f"adb connect {ADB_HOST}:{ADB_PORT}", check=False)
+
+
+def wait_package_manager(timeout: int = 120) -> None:
+    """Ждёт готовности Android Package Manager.
+
+    sys.boot_completed=1 не гарантирует готовность PM — на слабом железе
+    (< 4 GiB RAM) сервисы поднимаются ещё 30-60 сек после boot.
+    Признак готовности: 'pm path android' возвращает непустой результат.
+    """
+    print("[*] Ожидание Package Manager...")
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        r = adb("shell pm path android", capture=True, check=False)
+        if r.returncode == 0 and "package:" in r.stdout:
+            print("[+] Package Manager готов.")
+            return
+        time.sleep(3)
+    raise TimeoutError("Package Manager не готов за отведённое время.")
 
 
 def install_apk() -> None:
     """Устанавливает APK Tuya SmartLife в эмулятор.
 
     Флаг -r разрешает переустановку поверх существующей версии.
-    После установки ждём регистрации пакета в Package Manager.
+    На слабом железе Package Manager может быть не готов сразу после
+    boot_completed — ждём его отдельно, затем повторяем install при ошибке
+    'Broken pipe' (PM ещё занят инициализацией).
     """
     print("\n[3/6] Установка APK...")
     if not os.path.exists(APK_PATH):
         raise FileNotFoundError(f"APK не найден: {APK_PATH}")
-    adb(f"install -r {APK_PATH}")
+
+    wait_package_manager()
+
+    # Повторяем install — Broken pipe возможен даже после готовности PM
+    for attempt in range(1, 4):
+        print(f"  [*] Попытка установки {attempt}/3...")
+        r = adb(f"install -r {APK_PATH}", capture=True, check=False)
+        output = r.stdout + r.stderr
+        if r.returncode == 0 and "Success" in output:
+            print("[+] APK установлен.")
+            break
+        print(f"  [!] Ошибка: {output.strip()}")
+        if attempt < 3:
+            print("  [*] Ждём 10 сек и повторяем...")
+            time.sleep(10)
+    else:
+        raise RuntimeError(
+            f"Не удалось установить APK после 3 попыток. Последний вывод:\n{output}"
+        )
+
     wait_package(PACKAGE)
     time.sleep(3)
 
@@ -423,7 +503,9 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
 
     # ── Запуск приложения ────────────────────────────────────────────────────
     print("  [*] Запуск приложения...")
-    d.app_start(PACKAGE, stop=True)  # stop=True — принудительно убить если было запущено
+    d.app_start(
+        PACKAGE, stop=True
+    )  # stop=True — принудительно убить если было запущено
 
     # Ждём появления любого известного элемента стартового экрана
     first = wait_any(
@@ -444,7 +526,8 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
     if first is None:
         dump_ui(d, "tuya_start")
         raise RuntimeError(
-            "Приложение не показало стартовый экран. " "Смотри tuya_start.png / tuya_start.xml"
+            "Приложение не показало стартовый экран. "
+            "Смотри tuya_start.png / tuya_start.xml"
         )
 
     print(f"  [*] Первый элемент на экране: '{first}'")
@@ -500,7 +583,9 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
     )
     if not login_ready:
         dump_ui(d, "tuya_02_login_screen")
-        raise RuntimeError("Экран логина не появился. Смотри tuya_02_login_screen.png/xml")
+        raise RuntimeError(
+            "Экран логина не появился. Смотри tuya_02_login_screen.png/xml"
+        )
 
     dump_ui(d, "tuya_02_login_screen")
 
@@ -581,7 +666,9 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
             els[count - 1].click()
         else:
             dump_ui(d, "tuya_err_submit")
-            raise RuntimeError("Кнопка входа не найдена. Смотри tuya_err_submit.png/xml")
+            raise RuntimeError(
+                "Кнопка входа не найдена. Смотри tuya_err_submit.png/xml"
+            )
 
     # ── Ожидание результата авторизации ──────────────────────────────────────
     print("  [*] Ожидание авторизации и попапов (60 сек)...")
@@ -607,12 +694,16 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
 
     dump_ui(d, "tuya_04_after_login")
 
-    success_marker = wait_any(d, ["My Home", "My home", "All Devices", "Smart", "Me"], timeout=10)
+    success_marker = wait_any(
+        d, ["My Home", "My home", "All Devices", "Smart", "Me"], timeout=10
+    )
     if success_marker:
         print(f"  [+] Авторизация успешна (маркер: '{success_marker}').")
     else:
         if wait_any(d, ["Log in", "Log In", "Login"], timeout=3):
-            raise RuntimeError("Авторизация не прошла. Смотри tuya_04_after_login.png/xml")
+            raise RuntimeError(
+                "Авторизация не прошла. Смотри tuya_04_after_login.png/xml"
+            )
         print("  [!] Маркер главного экрана не найден — продолжаем.")
 
     # Даём приложению время записать конфиг на диск.
@@ -664,7 +755,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Автоматическое извлечение Tuya SmartLife конфигурации (local_key устройств)."
     )
-    parser.add_argument("--email", required=True, help="Email или телефон аккаунта Tuya/SmartLife")
+    parser.add_argument(
+        "--email", required=True, help="Email или телефон аккаунта Tuya/SmartLife"
+    )
     parser.add_argument("--password", required=True, help="Пароль аккаунта")
     parser.add_argument(
         "--country",

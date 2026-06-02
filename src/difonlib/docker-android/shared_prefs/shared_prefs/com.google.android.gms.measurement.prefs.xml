@@ -1,14 +1,14 @@
 <?xml version='1.0' encoding='utf-8' standalone='yes' ?>
 <map>
-    <long name="time_active" value="1153" />
-    <long name="last_upload" value="1780159581247" />
-    <long name="first_open_time" value="1780159581196" />
+    <long name="time_active" value="12576" />
+    <long name="last_upload" value="1780430657116" />
+    <long name="first_open_time" value="1780430657107" />
     <string name="gmp_app_id">1:309483856078:android:8f41761d142d7d4f</string>
     <string name="previous_os_version">11</string>
-    <string name="app_instance_id">a1a005d251f8a1f041d7f9c3c5fe4b87</string>
+    <string name="app_instance_id">8e5e41f2ba19403a1ff41d54c9fa1007</string>
     <boolean name="has_been_opened" value="true" />
-    <long name="health_monitor:start" value="1780159581249" />
+    <long name="health_monitor:start" value="1780430657116" />
     <boolean name="use_service" value="true" />
-    <long name="last_pause_time" value="1780159613782" />
+    <long name="last_pause_time" value="1780430688618" />
     <boolean name="start_new_session" value="false" />
 </map>
