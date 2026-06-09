@@ -1,0 +1,39 @@
+  $ adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+  $ adb -s 127.0.0.1:5555 shell getprop sys.boot_completed
+[+] Android загружен.
+  $ adb -s 127.0.0.1:5555 root
+restarting adbd as root
+  $ adb connect 127.0.0.1:5555
+already connected to 127.0.0.1:5555
+
+[3/6] Установка APK...
+[*] Ожидание Package Manager...
+  $ adb -s 127.0.0.1:5555 shell pm path android
+[+] Package Manager готов.
+  [*] Попытка установки 1/3...
+  $ adb -s 127.0.0.1:5555 install -r ./apk/com.tuya.smartlife_3.6.1.apk
+[+] APK установлен.
+[*] Ожидание пакета com.tuya.smartlife...
+  $ adb -s 127.0.0.1:5555 shell pm list packages com.tuya.smartlife
+[+] Пакет com.tuya.smartlife найден.
+
+[4/6] Автологин в TuyaSmartLife...
+  [*] Запуск приложения...
+  $ adb -s 127.0.0.1:5555 shell screencap -p /data/local/tmp/tuya_start.png
+  $ adb -s 127.0.0.1:5555 pull /data/local/tmp/tuya_start.png ./tuya_start.png
+/data/local/tmp/tuya_start.png: 1 file pulled, 0 skipped. 9.1 MB/s (456938 bytes in 0.048s)
+  [dbg] tuya_start тексты: ["System UI isn't responding", 'Close app', 'Wait', '5:53']
+
+[6/6] Остановка контейнера...
+  $ docker container stop android-arm-emulator-container
+android-arm-emulator-container
+[+] Готово.
+Traceback (most recent call last):
+  File "/home/dima/difonlib/src/difonlib/docker-android/get_tuya_preferences.py", line 796, in <module>
+    main()
+  File "/home/dima/difonlib/src/difonlib/docker-android/get_tuya_preferences.py", line 785, in main
+    login_tuya(args.email, args.password, args.country)
+  File "/home/dima/difonlib/src/difonlib/docker-android/get_tuya_preferences.py", line 529, in login_tuya
+    raise RuntimeError(
+RuntimeError: Приложение не показало стартовый экран. Смотри tuya_start.png / tuya_start.xml
+[dima@dima-mpd docker-android]$ 

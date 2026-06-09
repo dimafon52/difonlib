@@ -74,15 +74,13 @@ PACKAGE = "com.tuya.smartlife"
 REMOTE_PREFS_DIR = f"/data/data/{PACKAGE}/shared_prefs"
 
 # Куда сохранять извлечённые файлы на хосте.
-OUTPUT_DIR = "./shared_prefs"
+OUTPUT_DIR = "."
 
 
 # ── Низкоуровневые утилиты ───────────────────────────────────────────────────
 
 
-def run(
-    cmd: str, check: bool = True, capture: bool = False
-) -> subprocess.CompletedProcess:
+def run(cmd: str, check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
     """Выполняет shell-команду с выводом в консоль.
 
     Args:
@@ -97,14 +95,10 @@ def run(
     text = False
     if capture:
         text = True
-    return subprocess.run(
-        cmd, shell=True, check=check, capture_output=capture, text=text
-    )
+    return subprocess.run(cmd, shell=True, check=check, capture_output=capture, text=text)
 
 
-def adb(
-    cmd: str, capture: bool = False, check: bool = True
-) -> subprocess.CompletedProcess:
+def adb(cmd: str, capture: bool = False, check: bool = True) -> subprocess.CompletedProcess:
     """Обёртка над run() — добавляет '-s HOST:PORT' для точного выбора устройства.
 
     Использование явного -s обязательно когда на хосте несколько ADB-устройств
@@ -459,9 +453,7 @@ def install_apk() -> None:
             print("  [*] Ждём 10 сек и повторяем...")
             time.sleep(10)
     else:
-        raise RuntimeError(
-            f"Не удалось установить APK после 3 попыток. Последний вывод:\n{output}"
-        )
+        raise RuntimeError(f"Не удалось установить APK после 3 попыток. Последний вывод:\n{output}")
 
     wait_package(PACKAGE)
     time.sleep(3)
@@ -504,9 +496,7 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
 
     # ── Запуск приложения ────────────────────────────────────────────────────
     print("  [*] Запуск приложения...")
-    d.app_start(
-        PACKAGE, stop=True
-    )  # stop=True — принудительно убить если было запущено
+    d.app_start(PACKAGE, stop=True)  # stop=True — принудительно убить если было запущено
 
     # Ждём появления любого известного элемента стартового экрана
     first = wait_any(
@@ -527,8 +517,7 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
     if first is None:
         dump_ui(d, "tuya_start")
         raise RuntimeError(
-            "Приложение не показало стартовый экран. "
-            "Смотри tuya_start.png / tuya_start.xml"
+            "Приложение не показало стартовый экран. " "Смотри tuya_start.png / tuya_start.xml"
         )
 
     print(f"  [*] Первый элемент на экране: '{first}'")
@@ -584,9 +573,7 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
     )
     if not login_ready:
         dump_ui(d, "tuya_02_login_screen")
-        raise RuntimeError(
-            "Экран логина не появился. Смотри tuya_02_login_screen.png/xml"
-        )
+        raise RuntimeError("Экран логина не появился. Смотри tuya_02_login_screen.png/xml")
 
     dump_ui(d, "tuya_02_login_screen")
 
@@ -667,9 +654,7 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
             els[count - 1].click()
         else:
             dump_ui(d, "tuya_err_submit")
-            raise RuntimeError(
-                "Кнопка входа не найдена. Смотри tuya_err_submit.png/xml"
-            )
+            raise RuntimeError("Кнопка входа не найдена. Смотри tuya_err_submit.png/xml")
 
     # ── Ожидание результата авторизации ──────────────────────────────────────
     print("  [*] Ожидание авторизации и попапов (60 сек)...")
@@ -695,16 +680,12 @@ def login_tuya(email: str, password: str, country: str = "Israel") -> None:
 
     dump_ui(d, "tuya_04_after_login")
 
-    success_marker = wait_any(
-        d, ["My Home", "My home", "All Devices", "Smart", "Me"], timeout=10
-    )
+    success_marker = wait_any(d, ["My Home", "My home", "All Devices", "Smart", "Me"], timeout=10)
     if success_marker:
         print(f"  [+] Авторизация успешна (маркер: '{success_marker}').")
     else:
         if wait_any(d, ["Log in", "Log In", "Login"], timeout=3):
-            raise RuntimeError(
-                "Авторизация не прошла. Смотри tuya_04_after_login.png/xml"
-            )
+            raise RuntimeError("Авторизация не прошла. Смотри tuya_04_after_login.png/xml")
         print("  [!] Маркер главного экрана не найден — продолжаем.")
 
     # Даём приложению время записать конфиг на диск.
@@ -756,9 +737,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Автоматическое извлечение Tuya SmartLife конфигурации (local_key устройств)."
     )
-    parser.add_argument(
-        "--email", required=True, help="Email или телефон аккаунта Tuya/SmartLife"
-    )
+    parser.add_argument("--email", required=True, help="Email или телефон аккаунта Tuya/SmartLife")
     parser.add_argument("--password", required=True, help="Пароль аккаунта")
     parser.add_argument(
         "--country",

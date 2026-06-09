@@ -8,7 +8,7 @@ import json
 import os
 from pathlib import Path
 import tinytuya
-from tinytuya import Contrib
+from tinytuya import Contrib, OutletDevice
 
 # from typing import Dict, Optional, cast, Any, Callable, Type, LiteralString
 # import ctypes
@@ -57,7 +57,7 @@ class TuyaDevs:
         return None
 
     def get_dev(self, id: str) -> Optional[Dict[str, Any]]:
-        """Return device config by ID, or None if not found."""
+        """Return device from config, by ID, or None if not found."""
         for dev in self.devs_cfg:
             if dev["key"] == id:
                 return dev
@@ -113,8 +113,13 @@ class TuyaDevs:
     def ir_connect_to_dev(
         self, dev_id: str, local_key: str
     ) -> Optional[Contrib.IRRemoteControlDevice]:
+        """Learn a new IR button key:
+          btn_key = ir_dev.receive_button()
+        Send btn_key:
+          ir_dev.send_button(btn_key)
+        """
         try:
-            ir_dev = Contrib.IRRemoteControlDevice(
+            dev = Contrib.IRRemoteControlDevice(
                 dev_id=dev_id,
                 # address            = '192.168.0.89', #- no must
                 local_key=local_key,
@@ -124,20 +129,36 @@ class TuyaDevs:
         except Exception as e:
             print(f" =!= ir_connect_to_dev(): {e}")
             return None
-        return ir_dev
+        return dev
 
-    # learn a new IR button key
-    def ir_receive_button(
-        self, ir_dev: Optional[Contrib.IRRemoteControlDevice], timeout: int = 20
-    ) -> Optional[str]:
-        if not ir_dev:
-            print(f" =!= IR device is not connected! ir_dev:{ir_dev}")
+    def outlet_connect_to_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
+        """TurnOn/Off:
+        odev.turn_on()
+        odev.turn_off()
+        """
+        try:
+            dev = OutletDevice(
+                dev_id=dev_id,
+                local_key=local_key,
+                persist=True,
+                connection_timeout=5,
+            )
+        except Exception as e:
+            print(f" =!= outlet_connect_to_dev(): {e}")
             return None
-        print("Press button on your remote control")
-        button = ir_dev.receive_button(timeout=timeout)
-        if isinstance(button, str):
-            return button
-        return None
+        return dev
+
+    # def ir_receive_button(
+    #     self, ir_dev: Optional[Contrib.IRRemoteControlDevice], timeout: int = 20
+    # ) -> Optional[str]:
+    #     if not ir_dev:
+    #         print(f" =!= IR device is not connected! ir_dev:{ir_dev}")
+    #         return None
+    #     print("Press button on your remote control")
+    #     button = ir_dev.receive_button(timeout=timeout)
+    #     if isinstance(button, str):
+    #         return button
+    #     return None
 
 
 dbg = print
