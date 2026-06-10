@@ -2,6 +2,7 @@
 
 # 24.07.25
 
+# from socket import timeout
 from typing import Any, Optional, Dict, cast, List
 import xmltodict  # pip install xmltodict
 import json
@@ -36,7 +37,8 @@ class TuyaDevs:
     ):
         self.fscan_result = file_scan_result
         self.xml_file = xml_file
-        self.devs_cfg = self.load_cfg()
+        self.xmlcfg_devs = self.load_cfg()
+        self.devs_online: dict[str, dict[str, Any]] | Any = {}
 
     def load_cfg(self) -> List[Dict[str, Any]]:
         """Return list of tuya devices as list of dictionaries"""
@@ -48,7 +50,7 @@ class TuyaDevs:
 
     def get_localkey(self, id: str) -> Optional[str]:
         """Get localKey by device ID (key)"""
-        for dev in self.devs_cfg:
+        for dev in self.xmlcfg_devs:
             # print_dicts(dev)
             if not dev["localKey"]:
                 continue
@@ -56,15 +58,14 @@ class TuyaDevs:
                 return cast(str, dev["localKey"])
         return None
 
-    def get_dev(self, id: str) -> Optional[Dict[str, Any]]:
-        """Return device from config, by ID, or None if not found."""
-        for dev in self.devs_cfg:
+    def xmlcfg_get_dev(self, id: str) -> Optional[Dict[str, Any]]:
+        """Return device from xml config, None if not found."""
+        for dev in self.xmlcfg_devs:
             if dev["key"] == id:
                 return dev
         return None
 
-    # def _scan(self, force_update=False) -> Optional[Dict[str, str]]:
-    def _scan(self, force_update: bool = False) -> dict:
+    def json_scan(self, force_update: bool = False) -> dict:
         """Get last list of connected devices
         If force_update=True - Get connected devives for now
         """
@@ -74,17 +75,27 @@ class TuyaDevs:
             scan_data: dict = json.load(f)
         return cast(dict, scan_data["devices"])
 
-    def connected_devs(self, force_update: bool = False) -> list:
+    def scan(self, timeout: int = 6, by_id: bool = True) -> dict[str, dict[str, Any]] | Any:
+        """Scan by ID (default)
+        Return: {'bf36796bdace7a62fav1ys': {'ip': '192.168.0.82',
+        'gwId': 'bf36796bdace7a62fav1ys',
+        'active': 2,
+        .................}
+        """
+        self.devs_online = tinytuya.deviceScan(verbose=False, maxretry=timeout, byID=by_id)
+        return self.devs_online
+
+    def get_connected_devs(self, force_update: bool = False) -> list[dict]:
         """
         If force_update=True - get connected devives for now
         if not then last scan of connected devices from self.fscan_result
         """
         con_devs = []
-        connected_devices = self._scan(force_update)
+        connected_devices = self.json_scan(force_update)
         for con_dev in connected_devices:
             dev_id = con_dev["id"]
             dev_ip = con_dev["ip"]
-            dev_descript = self.get_dev(dev_id)
+            dev_descript = self.xmlcfg_get_dev(dev_id)
             dev_name = None
             dev_lk = None
             if dev_descript:
@@ -93,21 +104,24 @@ class TuyaDevs:
             con_devs += [{"id": dev_id, "ip": dev_ip, "name": dev_name, "localkey": dev_lk}]
         return con_devs
 
-    def all_devs(self) -> list:
+    def is_connected(self, dev_id: str, timeout: int = 6, rescan: bool = False) -> bool | None:
+        if rescan:
+            # update self.devs_online
+            self.scan(timeout=timeout)
+        return dev_id in self.devs_online
+
+    def get_devs(self, scan_timeout: int = 8) -> list[dict[str, str]]:
         """
-        If force_update=True - get connected devives for now
-        if not then last scan of connected devices from self.fscan_result
+        Scan devices for connect (online)
         """
+        self.scan(timeout=scan_timeout)
         all_devs = []
-        for con_dev in self.devs_cfg:
-            dev_id = con_dev["devId"]
-            dev_descript = self.get_dev(dev_id)
-            dev_name = None
-            dev_lk = None
-            if dev_descript:
-                dev_name = dev_descript["name"]
-                dev_lk = dev_descript["localKey"]
-            all_devs += [{"id": dev_id, "name": dev_name, "localkey": dev_lk}]
+        for dev in self.xmlcfg_devs:
+            dev_id = dev["devId"]
+            dev_name = dev.get("name")
+            dev_lk = dev.get("localKey")
+            dev_ip = self.devs_online.get(dev_id, {}).get("ip")
+            all_devs.append({"id": dev_id, "ip": dev_ip, "name": dev_name, "localkey": dev_lk})
         return all_devs
 
     def ir_connect_to_dev(
@@ -148,18 +162,6 @@ class TuyaDevs:
             return None
         return dev
 
-    # def ir_receive_button(
-    #     self, ir_dev: Optional[Contrib.IRRemoteControlDevice], timeout: int = 20
-    # ) -> Optional[str]:
-    #     if not ir_dev:
-    #         print(f" =!= IR device is not connected! ir_dev:{ir_dev}")
-    #         return None
-    #     print("Press button on your remote control")
-    #     button = ir_dev.receive_button(timeout=timeout)
-    #     if isinstance(button, str):
-    #         return button
-    #     return None
-
 
 dbg = print
 if __name__ == "__main__":
@@ -177,7 +179,7 @@ if __name__ == "__main__":
     # to = TuyaDevsData(xml_file=tuya_xml_data_file)
     td = TuyaDevs(xml_file=tuya_xml_data_file)
 
-    for i, _dev in enumerate(td.devs_cfg, start=1):
+    for i, _dev in enumerate(td.xmlcfg_devs, start=1):
         # print(f" {i}) {dev}")
         print(f"----------------------- {i} --------------------------")
         print_dicts(_dev)
@@ -185,7 +187,7 @@ if __name__ == "__main__":
 
     dev_id = "bf04409288bdad3dd5dx35"
 
-    dev = td.get_dev(dev_id)
+    dev = td.xmlcfg_get_dev(dev_id)
     dbg(f"dev: {dev}")  # //Dima
 
     localkey = td.get_localkey(dev_id)
@@ -195,14 +197,14 @@ if __name__ == "__main__":
     localkey = td.get_localkey(dev_id)
     dbg(f"dev_id: {dev_id}; localkey: {localkey}")  # //Dima
 
-    all_devs = td.all_devs()
+    all_devs = td.get_devs()
     for i, dev in enumerate(all_devs, start=1):
         # print(f" {i}) {dev}")
         print(f"----------------------- {i} --------------------------")
         print_dicts(dev)
         print("-----------------------------------------------------")
 
-    con_devs = td.connected_devs()
+    con_devs = td.get_connected_devs()
     for i, dev in enumerate(con_devs, start=1):
         # print(f" {i}) {dev}")
         print(f"----------------------- {i} --------------------------")
