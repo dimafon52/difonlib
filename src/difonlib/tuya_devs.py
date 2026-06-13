@@ -75,36 +75,49 @@ class TuyaDevs:
             scan_data: dict = json.load(f)
         return cast(dict, scan_data["devices"])
 
-    def scan(self, timeout: int = 6, by_id: bool = True) -> dict[str, dict[str, Any]] | Any:
+    def scan(self, timeout: int = 8, by_id: bool = True) -> dict[str, dict[str, Any]] | Any:
         """Scan by ID (default)
         Return: {'bf36796bdace7a62fav1ys': {'ip': '192.168.0.82',
         'gwId': 'bf36796bdace7a62fav1ys',
         'active': 2,
-        .................}
+        'encrypt': True,
+        'productKey': 'keyjup78v54myhan',
+        'version': '3.3',
+        'name': '',
+        'key': '',
+        'mac': '',
+        'id': 'bf36796bdace7a62fav1ys',
+        'ability': 0,
+        'token': '',
+        'wf_cfg': '',
+        'dev_type': 'default',
+        'origin': 'broadcast'}}
         """
         self.devs_online = tinytuya.deviceScan(verbose=False, maxretry=timeout, byID=by_id)
         return self.devs_online
 
-    def get_connected_devs(self, force_update: bool = False) -> list[dict]:
-        """
-        If force_update=True - get connected devives for now
-        if not then last scan of connected devices from self.fscan_result
-        """
-        con_devs = []
-        connected_devices = self.json_scan(force_update)
-        for con_dev in connected_devices:
-            dev_id = con_dev["id"]
-            dev_ip = con_dev["ip"]
-            dev_descript = self.xmlcfg_get_dev(dev_id)
-            dev_name = None
-            dev_lk = None
-            if dev_descript:
-                dev_name = dev_descript["name"]
-                dev_lk = dev_descript["localKey"]
-            con_devs += [{"id": dev_id, "ip": dev_ip, "name": dev_name, "localkey": dev_lk}]
-        return con_devs
+    # def get_connected_devs(self, force_update: bool = False) -> list[dict]:
+    #     """
+    #     If force_update=True - get connected devives for now
+    #     if not then last scan of connected devices from self.fscan_result
+    #     """
+    #     con_devs = []
+    #     connected_devices = self.json_scan(force_update)
+    #     for con_dev in connected_devices:
+    #         dev_id = con_dev["id"]
+    #         dev_ip = con_dev["ip"]
+    #         dev_descript = self.xmlcfg_get_dev(dev_id)
+    #         dev_name = None
+    #         dev_lk = None
+    #         if dev_descript:
+    #             dev_name = dev_descript["name"]
+    #             dev_lk = dev_descript["localKey"]
+    #         con_devs += [
+    #             {"id": dev_id, "ip": dev_ip, "name": dev_name, "localkey": dev_lk}
+    #         ]
+    #     return con_devs
 
-    def is_connected(self, dev_id: str, timeout: int = 6, rescan: bool = False) -> bool | None:
+    def dev_is_connected(self, dev_id: str, timeout: int = 8, rescan: bool = False) -> bool | None:
         if rescan:
             # update self.devs_online
             self.scan(timeout=timeout)
@@ -118,15 +131,22 @@ class TuyaDevs:
         all_devs = []
         for dev in self.xmlcfg_devs:
             dev_id = dev["devId"]
+            dev_prod_key = dev.get("productKey")
             dev_name = dev.get("name")
             dev_lk = dev.get("localKey")
             dev_ip = self.devs_online.get(dev_id, {}).get("ip")
-            all_devs.append({"id": dev_id, "ip": dev_ip, "name": dev_name, "localkey": dev_lk})
+            all_devs.append(
+                {
+                    "id": dev_id,
+                    "ip": dev_ip,
+                    "name": dev_name,
+                    "localkey": dev_lk,
+                    "prod_key": dev_prod_key,
+                }
+            )
         return all_devs
 
-    def ir_connect_to_dev(
-        self, dev_id: str, local_key: str
-    ) -> Optional[Contrib.IRRemoteControlDevice]:
+    def ir_dev(self, dev_id: str, local_key: str) -> Optional[Contrib.IRRemoteControlDevice]:
         """Learn a new IR button key:
           btn_key = ir_dev.receive_button()
         Send btn_key:
@@ -141,11 +161,11 @@ class TuyaDevs:
                 connection_timeout=5,
             )
         except Exception as e:
-            print(f" =!= ir_connect_to_dev(): {e}")
+            print(f" ❌ ir_dev(): {e}")
             return None
         return dev
 
-    def outlet_connect_to_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
+    def outlet_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
         """TurnOn/Off:
         odev.turn_on()
         odev.turn_off()
@@ -158,7 +178,7 @@ class TuyaDevs:
                 connection_timeout=5,
             )
         except Exception as e:
-            print(f" =!= outlet_connect_to_dev(): {e}")
+            print(f" ❌ outlet_dev(): {e}")
             return None
         return dev
 
@@ -204,7 +224,7 @@ if __name__ == "__main__":
         print_dicts(dev)
         print("-----------------------------------------------------")
 
-    con_devs = td.get_connected_devs()
+    con_devs = td.get_devs()
     for i, dev in enumerate(con_devs, start=1):
         # print(f" {i}) {dev}")
         print(f"----------------------- {i} --------------------------")
