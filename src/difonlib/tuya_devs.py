@@ -39,6 +39,7 @@ class TuyaDevs:
         self.xml_file = xml_file
         self.xmlcfg_devs = self.load_cfg()
         self.devs_online: dict[str, dict[str, Any]] | Any = {}
+        self.last_scan: list[dict[str, str]] | None = None
 
     def load_cfg(self) -> List[Dict[str, Any]]:
         """Return list of tuya devices as list of dictionaries"""
@@ -128,22 +129,26 @@ class TuyaDevs:
         Scan devices for connect (online)
         """
         self.scan(timeout=scan_timeout)
-        all_devs = []
+        all_devs: list = []
         for dev in self.xmlcfg_devs:
             dev_id = dev["devId"]
-            dev_prod_key = dev.get("productKey")
+            dev_prod_key = dev.get("productId")
             dev_name = dev.get("name")
             dev_lk = dev.get("localKey")
             dev_ip = self.devs_online.get(dev_id, {}).get("ip")
-            all_devs.append(
+            # first online devices
+            index = 0 if dev_ip else len(all_devs)
+            all_devs.insert(
+                index,
                 {
                     "id": dev_id,
                     "ip": dev_ip,
                     "name": dev_name,
                     "localkey": dev_lk,
                     "prod_key": dev_prod_key,
-                }
+                },
             )
+        self.last_scan = all_devs
         return all_devs
 
     def ir_dev(self, dev_id: str, local_key: str) -> Optional[Contrib.IRRemoteControlDevice]:
