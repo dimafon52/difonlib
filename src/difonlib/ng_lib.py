@@ -55,7 +55,9 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes("text-base")
+                    self.processing_label = ui.label("Processing...").classes(
+                        "text-base"
+                    )
 
     def visible(self, state: bool) -> None:
         self.table.visible = state
@@ -126,5 +128,5 @@ class CardTable:
                 await self._run_with_processing(on_click)
 
         btn.on_click(handle_click)
-        setattr(self, f"btn{btn_txt}", btn)
+        setattr(self, f"btn{btn_txt.replace(' ','_')}", btn)
         return btn

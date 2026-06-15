@@ -29,6 +29,13 @@ tuya_xml_data_file = Path(
 )
 
 
+class OutletDeviceM(OutletDevice):
+    def toggle(self) -> bool | Any:
+        data = self.status()
+        switch_state: bool = data["dps"]["1"]
+        return self.set_status(not switch_state)["dps"]["1"]
+
+
 class TuyaDevs:
     def __init__(
         self,
@@ -176,7 +183,7 @@ class TuyaDevs:
         odev.turn_off()
         """
         try:
-            dev = OutletDevice(
+            dev = OutletDeviceM(
                 dev_id=dev_id,
                 local_key=local_key,
                 persist=True,
