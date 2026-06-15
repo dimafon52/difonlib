@@ -13,16 +13,25 @@ def main() -> None:
         selection="single",
         rows=[
             {"id": "123456", "name": "NNNNN", "_used": True},
-            {"id": "123456", "name": "NNNNN", "_used": False},
             {"id": "123456", "name": "NNNNN", "_used": True},
             {"id": "123456", "name": "NNNNN", "_used": False},
-            {"id": "123456", "name": "NNNNN", "_used": True},
+            {"id": "123456", "name": "NNNNN", "_used": False},
             {"id": "123456", "name": "NNNNN", "_used": True},
         ],
     )
 
     card_table.table.add_slot(
         "body-cell-name",
+        r"""
+        <q-td :props="props">
+        <span :class="props.row._used ? 'text-green' : ''">
+    {{ props.value }}
+        </span>
+        </q-td>
+        """,
+    )
+    card_table.table.add_slot(
+        "body-cell-id",
         r"""
         <q-td :props="props">
         <span :class="props.row._used ? 'text-green' : ''">
