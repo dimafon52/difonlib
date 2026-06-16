@@ -15,12 +15,13 @@ def main() -> None:
             title: str,
             columns: list,
             rows: list[dict] | None = None,
+            marked_text_color: str | None = "yellow",
             selection: Literal["single", "multiple"] | None = None,
             on_selection_change: list[Callable] | None = None,
         ):
             super().__init__(title, columns, rows, selection, on_selection_change)
-            color = "yellow"
-            cell = "id"
+            self.marked_text_color = marked_text_color
+            color = self.marked_text_color
             for cell in self.table.rows[0].keys():
                 self.table.add_slot(
                     f"body-cell-{cell}",
@@ -43,14 +44,15 @@ def main() -> None:
         columns=[
             {"name": "id", "label": "id", "field": "id"},
             {"name": "name", "label": "Name", "field": "name"},
+            {"name": "ip", "label": "IP Address", "field": "ip"},
         ],
         selection="single",
         rows=[
-            {"id": "123456", "name": "ANNNNN"},
-            {"id": "987654", "name": "VNNNNN"},
-            {"id": "123456", "name": "BNNNNN"},
-            {"id": "003456", "name": "SNNNNN"},
-            {"id": "129956", "name": "QNNNNN"},
+            {"id": "123456", "name": "ANNNNN", "ip": "192.168.0.148"},
+            {"id": "987654", "name": "VNNNNN", "ip": "192.168.0.148"},
+            {"id": "123456", "name": "BNNNNN", "ip": "192.168.0.148"},
+            {"id": "003456", "name": "SNNNNN", "ip": "192.168.0.148"},
+            {"id": "129956", "name": "QNNNNN", "ip": "192.168.0.148"},
         ],
     )
 
