@@ -1,7 +1,6 @@
-from typing import Any, Callable, Awaitable, Literal
+from typing import Callable, Literal
 from nicegui import ui
 from ng_lib import CardTable
-import time
 
 
 @ui.page("/", dark=True)

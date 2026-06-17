@@ -99,7 +99,7 @@ class CardTable:
     #         self.table.update()
     #     return found
 
-    def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict]:
+    def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict[str, Any]]:
         """
         card_table.mark_row(id="123456", name="ANNNNN")
         card_table.mark_row(ip="192.168.0.18", mark=False)
@@ -145,8 +145,8 @@ class CardTable:
             return
         await self._run_with_processing(handler)
 
-    def enum_data(self, data: list[dict]) -> list[dict]:
-        return [{"sn": i + 1, **row} for i, row in enumerate(data)]
+    def enum_data(self, rows: list[dict]) -> list[dict]:
+        return [{"sn": i + 1, **row} for i, row in enumerate(rows)]
 
     def set_rows(self, rows: list[dict]) -> None:
         self.table.rows = self.enum_data(rows)
