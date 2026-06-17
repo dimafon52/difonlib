@@ -18,9 +18,13 @@ class CardTable:
         rows: list[dict] | None = None,
         selection: Literal["single", "multiple"] | None = None,
         on_selection_change: list[Callable] | None = None,
+        marked_text_color: str = "yellow",
+        marked_field: str = "_marked",
     ):
         self.on_selection_change: list[Callable] = on_selection_change or []
         self.buttons_on_row_select_changed: list = []
+        self.marked_text_color = marked_text_color
+        self.marked_field = marked_field
 
         with ui.card().classes("p-4 shadow-lg") as self.card:
             with ui.row().classes("items-center justify-between w-full mb-2"):
@@ -29,7 +33,7 @@ class CardTable:
                     pass
 
             self.table = ui.table(
-                columns=columns,
+                columns=self._normalize_columns(columns),
                 rows=self.enum_data(rows or []),
                 row_key="sn",
                 selection=selection,
@@ -58,6 +62,56 @@ class CardTable:
                     self.processing_label = ui.label("Processing...").classes(
                         "text-base"
                     )
+
+        if self.marked_field:
+            color_class = f"text-{self.marked_text_color}"
+            for column in self.table.columns:
+                cell = column["name"]
+                self.table.add_slot(
+                    f"body-cell-{cell}",
+                    rf"""
+                    <q-td :props="props">
+                    <span :class="props.row.{self.marked_field} ? 'font-bold {color_class}' : ''">
+                    {{{{props.value}}}}
+                    </span>
+                    </q-td>
+                    """,
+                )
+
+    def _normalize_columns(self, columns: list[dict]) -> list[dict]:
+        """Add field 'name', needed for Quasar GUI"""
+        return [{**col, "name": col.get("name", col["field"])} for col in columns]
+
+    # def mark_row(self, index: int, state: bool = True) -> None:
+    #     self.table.rows[index]["_marked"] = state
+    #     self.table.update()
+
+    # def mark_row(
+    #     self, field_name: str, field_value: Any, mark: bool = True
+    # ) -> list[dict[str, Any]]:
+    #     found = []
+    #     for row in self.table.rows:
+    #         dbg(f"row[field_name]: {row[field_name]}")  # //Dima
+    #         if row[field_name] == field_value:
+    #             row[self.marked_field] = mark
+    #             found.append(row)
+    #     if found:
+    #         self.table.update()
+    #     return found
+
+    def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict]:
+        """
+        card_table.mark_row(id="123456", name="ANNNNN")
+        card_table.mark_row(ip="192.168.0.18", mark=False)
+        """
+        found = []
+        for row in self.table.rows:
+            if all(row.get(k) == v for k, v in kwrds.items()):
+                row[self.marked_field] = mark
+                found.append(row)
+        if found:
+            self.table.update()
+        return found
 
     def visible(self, state: bool) -> None:
         self.table.visible = state
