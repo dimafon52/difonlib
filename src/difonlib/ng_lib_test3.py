@@ -1,4 +1,4 @@
-from typing import Callable, Literal, Any
+from typing import Callable
 from nicegui import ui
 from ng_lib import CardTable
 import functools
@@ -21,18 +21,16 @@ class DialogBox:
         #         ui.label(text=text).classes("text-xl")
         #         text-xl — это Tailwind, соответствует 1.25rem. Если нужно крупнее — text-2xl, text-3xl.
 
-        ui.add_css(
-            """
+        ui.add_css("""
             .q-notification__message {
             font-size: 20px !important;
             }
             .q-dialog .q-card {
             font-size: 20px !important;
             }
-            """
-        )
+            """)
 
-    async def dialog_ok(self, text="Hello!)") -> None:
+    async def dialog_ok(self, text: str = "Hello!)") -> None:
         with ui.dialog().props("persistent") as dialog, ui.card():
             ui.label(text=text)
             ui.button("Close", on_click=dialog.close)
@@ -43,8 +41,8 @@ class DialogBox:
         text: str,
         on_click_ok: Callable,
         on_click_cancel: Callable = lambda: None,
-        btn_ok="OK",
-        btn_cancel="Cancel",
+        btn_ok: str = "OK",
+        btn_cancel: str = "Cancel",
     ) -> None:
         with ui.dialog().props("persistent") as dialog, ui.card():
             ui.label(text=text)
@@ -53,13 +51,11 @@ class DialogBox:
                     btn_ok,
                     on_click=lambda: (on_click_ok(), dialog.close()),
                 )
-                ui.button(
-                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
-                )
+                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
         dialog.open()
 
     async def dialog_confirm(
-        self, text: str = "Are you sure?", btn_ok="Yes", btn_cancel="No"
+        self, text: str = "Are you sure?", btn_ok: str = "Yes", btn_cancel: str = "No"
     ) -> ui.dialog:
         with ui.dialog().props("persistent") as dialog, ui.card():
             ui.label(text=text)
@@ -113,10 +109,10 @@ def main() -> None:
 
     dialog_box = DialogBox()
 
-    def btnok():
+    def btnok() -> None:
         ui.notify("You press OK")
 
-    def btncancel():
+    def btncancel() -> None:
         ui.notify("You press Cancel")
 
     card_table.add_button(
@@ -129,7 +125,7 @@ def main() -> None:
         ),
     )
 
-    async def confirm():
+    async def confirm() -> None:
         result = await dialog_box.dialog_confirm()
         ui.notify(f"You chose {result}")
 

@@ -59,9 +59,7 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes(
-                        "text-base"
-                    )
+                    self.processing_label = ui.label("Processing...").classes("text-base")
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
