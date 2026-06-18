@@ -82,23 +82,6 @@ class CardTable:
         """Add field 'name', needed for Quasar GUI"""
         return [{**col, "name": col.get("name", col["field"])} for col in columns]
 
-    # def mark_row(self, index: int, state: bool = True) -> None:
-    #     self.table.rows[index]["_marked"] = state
-    #     self.table.update()
-
-    # def mark_row(
-    #     self, field_name: str, field_value: Any, mark: bool = True
-    # ) -> list[dict[str, Any]]:
-    #     found = []
-    #     for row in self.table.rows:
-    #         dbg(f"row[field_name]: {row[field_name]}")  # //Dima
-    #         if row[field_name] == field_value:
-    #             row[self.marked_field] = mark
-    #             found.append(row)
-    #     if found:
-    #         self.table.update()
-    #     return found
-
     def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict[str, Any]]:
         """
         card_table.mark_row(id="123456", name="ANNNNN")
