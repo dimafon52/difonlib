@@ -1,85 +1,11 @@
 from typing import Callable
 from nicegui import ui
-from ng_lib import CardTable
+from ng_lib import CardTable, DialogBox
 import functools
 
 from difonlib.bt_utils import logdbg
 
 dbg = logdbg
-
-
-class DialogBox:
-
-    def __init__(self) -> None:
-        self.dialog: ui.dialog | None = None
-        # https://claude.ai/share/227ce46f-f825-4783-8e0e-9e774963ec84
-        #         Или точечнее — только ui.label внутри диалога:
-        #         python.q-dialog .q-card .q-item__label {
-        #             font-size: 20px !important;
-        #         }
-        #         Либо ещё проще — прямо в коде диалога:
-        #         ui.label(text=text).classes("text-xl")
-        #         text-xl — это Tailwind, соответствует 1.25rem. Если нужно крупнее — text-2xl, text-3xl.
-
-        ui.add_css("""
-            .q-notification__message {
-            font-size: 20px !important;
-            }
-            .q-dialog .q-card {
-            font-size: 20px !important;
-            }
-            """)
-
-    async def dialog_ok(self, text: str = "Hello!)") -> None:
-        with ui.dialog().props("persistent") as dialog, ui.card():
-            ui.label(text=text)
-            ui.button("Close", on_click=dialog.close)
-        dialog.open()
-
-    async def dialog_ok_cancel(
-        self,
-        text: str,
-        on_click_ok: Callable,
-        on_click_cancel: Callable = lambda: None,
-        btn_ok: str = "OK",
-        btn_cancel: str = "Cancel",
-    ) -> None:
-        with ui.dialog().props("persistent") as dialog, ui.card():
-            ui.label(text=text)
-            with ui.row():
-                ui.button(
-                    btn_ok,
-                    on_click=lambda: (on_click_ok(), dialog.close()),
-                )
-                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
-        dialog.open()
-
-    async def dialog_confirm(
-        self, text: str = "Are you sure?", btn_ok: str = "Yes", btn_cancel: str = "No"
-    ) -> ui.dialog:
-        with ui.dialog().props("persistent") as dialog, ui.card():
-            ui.label(text=text)
-            with ui.row():
-                ui.button(btn_ok, on_click=lambda: dialog.submit(btn_ok))
-                ui.button(btn_cancel, on_click=lambda: dialog.submit(btn_cancel))
-        return await dialog
-
-    async def dialog_input(
-        self,
-        text: str,
-        on_click_ok: Callable,
-        btn_ok: str = "OK",
-        btn_cancel: str = "Cancel",
-    ) -> None:
-        with ui.dialog().props("persistent") as dialog, ui.card():
-            ui.label(text=text)
-            with ui.row():
-                ui.button(
-                    text=btn_ok,
-                    on_click=lambda: (on_click_ok(), dialog.close()),
-                )
-                ui.button(btn_cancel, on_click=dialog.close)
-        dialog.open()
 
 
 @ui.page("/", dark=True)
@@ -132,6 +58,15 @@ def main() -> None:
     card_table.add_button(
         "test_confirm",
         on_click=confirm,
+    )
+
+    async def dialog_input() -> None:
+        inp = await dialog_box.dialog_input("Input IR_KEY_NAME")
+        ui.notify(f"Your input: {inp}")
+
+    card_table.add_button(
+        "test_input",
+        on_click=dialog_input,
     )
 
 

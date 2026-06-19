@@ -6,6 +6,76 @@ from typing import Any, Callable, Awaitable, Literal
 from difonlib.utils import logdbg
 
 dbg = logdbg
+# https://claude.ai/share/227ce46f-f825-4783-8e0e-9e774963ec84
+#         Или точечнее — только ui.label внутри диалога:
+#         python.q-dialog .q-card .q-item__label {
+#             font-size: 20px !important;
+#         }
+#         Либо ещё проще — прямо в коде диалога:
+#         ui.label(text=text).classes("text-xl")
+#         text-xl — это Tailwind, соответствует 1.25rem. Если нужно крупнее — text-2xl, text-3xl.
+ui.add_css(
+    """
+    .q-notification__message {
+    font-size: 20px !important;
+    }
+    .q-dialog .q-card {
+    font-size: 20px !important;
+    }
+    """,
+    shared=True,
+)
+
+
+class DialogBox:
+    async def dialog_ok(self, text: str = "Hello!)") -> None:
+        with ui.dialog().props("persistent") as dialog, ui.card():
+            ui.label(text=text)
+            ui.button("Close", on_click=dialog.close)
+        dialog.open()
+
+    async def dialog_ok_cancel(
+        self,
+        text: str,
+        on_click_ok: Callable,
+        on_click_cancel: Callable = lambda: None,
+        btn_ok: str = "OK",
+        btn_cancel: str = "Cancel",
+    ) -> None:
+        with ui.dialog().props("persistent") as dialog, ui.card():
+            ui.label(text=text)
+            with ui.row():
+                ui.button(
+                    btn_ok,
+                    on_click=lambda: (on_click_ok(), dialog.close()),
+                )
+                ui.button(
+                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
+                )
+        dialog.open()
+
+    async def dialog_confirm(
+        self, text: str = "Are you sure?", btn_ok: str = "Yes", btn_cancel: str = "No"
+    ) -> ui.dialog:
+        with ui.dialog().props("persistent") as dialog, ui.card():
+            ui.label(text=text)
+            with ui.row():
+                ui.button(btn_ok, on_click=lambda: dialog.submit(btn_ok))
+                ui.button(btn_cancel, on_click=lambda: dialog.submit(btn_cancel))
+        return await dialog
+
+    async def dialog_input(
+        self,
+        text: str,
+    ) -> ui.dialog:
+        with ui.dialog().props("persistent") as dialog, ui.card():
+            ui.label(text=text)
+            with ui.row():
+                inp: ui.input = ui.input(label="IR button").on(
+                    "keydown.enter", lambda: dialog.submit(inp.value)
+                )
+                ui.button(text="Enter", on_click=lambda: dialog.submit(inp.value))
+        return await dialog
 
 
 class CardTable:
@@ -59,7 +129,9 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes("text-base")
+                    self.processing_label = ui.label("Processing...").classes(
+                        "text-base"
+                    )
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
@@ -115,7 +187,7 @@ class CardTable:
                 await handler()
             else:
                 handler()
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.1)
         finally:
             self.processing_dialog.close()
 
