@@ -67,14 +67,17 @@ class DialogBox:
     async def dialog_input(
         self,
         text: str,
+        input_prefix: str = "",
+        **kwrds: Any,
     ) -> ui.dialog:
         with ui.dialog().props("persistent") as dialog, ui.card():
             ui.label(text=text)
             with ui.row():
-                inp: ui.input = ui.input(label="IR button").on(
+                inp: ui.input = ui.input(value=input_prefix, **kwrds).on(
                     "keydown.enter", lambda: dialog.submit(inp.value)
                 )
                 ui.button(text="Enter", on_click=lambda: dialog.submit(inp.value))
+                ui.button(text="Cancel", on_click=dialog.close)
         return await dialog
 
 
@@ -98,6 +101,8 @@ class CardTable:
 
         with ui.card().classes("p-4 shadow-lg") as self.card:
             with ui.row().classes("items-center justify-between w-full mb-2"):
+                with ui.row().classes("gap-2") as self.left_table:
+                    pass
                 ui.label(f"📋 {title}").classes("text-green-700 text-lg font-bold")
                 with ui.row().classes("gap-2") as self.top_table:
                     pass
@@ -204,6 +209,28 @@ class CardTable:
     def set_rows(self, rows: list[dict]) -> None:
         self.table.rows = self.enum_data(rows)
         self.table.update()
+
+    def add_checkbox(
+        self,
+        chbox_txt: str,
+        on_change: Callable,
+        default_enable: bool = False,
+    ) -> ui.checkbox:
+        """
+        card_table.add_checkbox(chbox_txt="Used Only", on_change=lambda v: ui.notify(v))
+        """
+        with self.top_table:
+            chbox = ui.checkbox(chbox_txt, value=default_enable).classes("font-bold")
+
+        async def handle_change(e: Any) -> None:
+            if inspect.iscoroutinefunction(on_change):
+                await on_change(e.sender.value)
+            else:
+                on_change(e.sender.value)
+
+        chbox.on("click", handle_change)
+        setattr(self, f"chbox{chbox_txt.replace(' ', '_')}", chbox)
+        return chbox
 
     def add_button(
         self,

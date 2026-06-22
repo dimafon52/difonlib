@@ -125,7 +125,7 @@ class TuyaDevs:
     #         ]
     #     return con_devs
 
-    def dev_is_connected(self, dev_id: str, timeout: int = 8, rescan: bool = False) -> bool | None:
+    def dev_is_connected(self, dev_id: str, timeout: int = 8, rescan: bool = False) -> bool:
         if rescan:
             # update self.devs_online
             self.scan(timeout=timeout)

@@ -1,4 +1,3 @@
-from typing import Callable
 from nicegui import ui
 from ng_lib import CardTable, DialogBox
 import functools
@@ -31,7 +30,12 @@ def main() -> None:
     found = card_table.mark_row(id="123456", mark=True)
     print(f"card_table.table.rows:{card_table.table.rows}")  # //Dima
     found = card_table.mark_row(id="123456", name="ANNNNN", mark=False)
+    found = card_table.mark_row(id="129956")
     print(f" ==> found: {found}")  # //Dima
+
+    print(f"card_table.table.rows: {card_table.table.rows}")
+
+    card_table.add_checkbox(chbox_txt="Used Only", on_change=lambda v: ui.notify(v))
 
     dialog_box = DialogBox()
 
@@ -61,7 +65,7 @@ def main() -> None:
     )
 
     async def dialog_input() -> None:
-        inp = await dialog_box.dialog_input("Input IR_KEY_NAME")
+        inp = await dialog_box.dialog_input("Input IR_KEY_NAME", input_prefix="IR_KEY_")
         ui.notify(f"Your input: {inp}")
 
     card_table.add_button(
