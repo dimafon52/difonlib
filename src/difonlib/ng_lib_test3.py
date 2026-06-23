@@ -33,9 +33,32 @@ def main() -> None:
     found = card_table.mark_row(id="129956")
     print(f" ==> found: {found}")  # //Dima
 
-    print(f"card_table.table.rows: {card_table.table.rows}")
+    card_table.set_filter("_marked")
+    # card_table.set_filter("id")
 
-    card_table.add_checkbox(chbox_txt="Used Only", on_change=lambda v: ui.notify(v))
+    # self.table.props(':filter="\'online\'"')
+    # self.table.update()
+
+    def only_marked(mark: bool = False, def_value="\\'\\'") -> None:
+        print(f"table rows: {card_table.table.rows}")
+        field_value = def_value
+        vv = "123456"
+        vv = mark
+        # vv = "true"
+        if mark:
+            dbg(f" === MARK ===")  # //Dima
+            if isinstance(vv, str):
+                field_value = f"\\'{vv}\\'"
+            else:
+                field_value = mark
+        else:
+            dbg(f" === NOT MARK ===")  # //Dima
+        dbg(f" * field_value: {field_value}")  # //Dima
+        card_table.table.props(f':filter="{field_value}"')
+        card_table.table.update()
+
+    # card_table.add_checkbox(chbox_txt="Used Only", on_change=lambda v: ui.notify(v))
+    card_table.add_checkbox(chbox_txt="Used Only", on_change=lambda v: only_marked(v))
 
     dialog_box = DialogBox()
 

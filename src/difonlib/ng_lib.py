@@ -49,7 +49,9 @@ class DialogBox:
                     btn_ok,
                     on_click=lambda: (on_click_ok(), dialog.close()),
                 )
-                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
+                ui.button(
+                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
+                )
         dialog.open()
 
     async def dialog_confirm(
@@ -116,6 +118,20 @@ class CardTable:
                     "headerClasses": "uppercase",
                 },
             ).classes("w-full shadow-lg bg-black-900 text-gray-200")
+            # self.table.props(
+            #     r"""
+            #     :filter-method="(rows, terms) => terms ? rows.filter(r => r._marked) : rows"
+            #     """
+            # )
+
+            # field = "_marked"
+            # field = "id"
+
+            # self.table.props(
+            #     rf"""
+            #     :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field} === terms)"
+            #     """
+            # )
 
             with (
                 ui.dialog().props("persistent") as self.confirm_dialog,
@@ -132,7 +148,9 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes("text-base")
+                    self.processing_label = ui.label("Processing...").classes(
+                        "text-base"
+                    )
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
@@ -152,6 +170,13 @@ class CardTable:
     def _normalize_columns(self, columns: list[dict]) -> list[dict]:
         """Add field 'name', needed for Quasar GUI"""
         return [{**col, "name": col.get("name", col["field"])} for col in columns]
+
+    def set_filter(self, field_name: str) -> None:
+        self.table.props(
+            rf"""
+            :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field_name} === terms)"
+            """
+        )
 
     def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict[str, Any]]:
         """
