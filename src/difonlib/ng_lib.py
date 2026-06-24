@@ -49,9 +49,7 @@ class DialogBox:
                     btn_ok,
                     on_click=lambda: (on_click_ok(), dialog.close()),
                 )
-                ui.button(
-                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
-                )
+                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
         dialog.open()
 
     async def dialog_confirm(
@@ -82,7 +80,7 @@ class DialogBox:
 
 
 class CardTable:
-    _current_yes_handler: Callable[[], None | Awaitable[None]] | None = None
+    # _current_yes_handler: Callable[[], None | Awaitable[None]] | None = None
 
     def __init__(
         self,
@@ -98,6 +96,8 @@ class CardTable:
         self.buttons_on_row_select_changed: list = []
         self.marked_text_color = marked_text_color
         self.marked_field = marked_field
+        self.filter_value: str | bool = ""
+        self._current_yes_handler: Callable[[], None | Awaitable[None]] | None = None
 
         with ui.card().classes("p-4 shadow-lg") as self.card:
             with ui.row().classes("items-center justify-between w-full mb-2"):
@@ -118,20 +118,6 @@ class CardTable:
                     "headerClasses": "uppercase",
                 },
             ).classes("w-full shadow-lg bg-black-900 text-gray-200")
-            # self.table.props(
-            #     r"""
-            #     :filter-method="(rows, terms) => terms ? rows.filter(r => r._marked) : rows"
-            #     """
-            # )
-
-            # field = "_marked"
-            # field = "id"
-
-            # self.table.props(
-            #     rf"""
-            #     :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field} === terms)"
-            #     """
-            # )
 
             with (
                 ui.dialog().props("persistent") as self.confirm_dialog,
@@ -148,9 +134,7 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes(
-                        "text-base"
-                    )
+                    self.processing_label = ui.label("Processing...").classes("text-base")
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
@@ -171,17 +155,43 @@ class CardTable:
         """Add field 'name', needed for Quasar GUI"""
         return [{**col, "name": col.get("name", col["field"])} for col in columns]
 
-    def set_filter(self, field_name: str) -> None:
-        self.table.props(
-            rf"""
+    def set_row_display_filter(self, field_name: str, field_value: str | bool) -> None:
+        """
+        card_table.set_row_display_filter("id","123456")
+         Show rows with field id='123456':
+        card_table.row_display_filter(state_on=True)
+         Show all rows:
+        card_table.row_display_filter()
+        """
+        if isinstance(field_value, bool):
+            self.filter_value = field_value
+        else:
+            self.filter_value = f"\\'{field_value}\\'"
+
+        self.table.props(rf"""
             :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field_name} === terms)"
-            """
-        )
+            """)
+
+    def row_display_filter(self, state_on: bool = False) -> None:
+        """
+        card_table.set_row_display_filter(field_name="id", field_value="123456")
+        card_table.row_display_filter(state_on=True)
+         Show rows with field id='123456'
+        card_table.set_row_display_filter("_marked", True)
+        card_table.row_display_filter(True)
+         Show rows with field _marked=True
+        """
+        dbg(f"self.filter_value: {self.filter_value}")  # //Dima
+        if state_on:
+            self.table.props(f':filter="{self.filter_value}"')
+        else:
+            self.table.props(':filter=""')
+        self.table.update()
 
     def mark_row(self, mark: bool = True, **kwrds: Any) -> list[dict[str, Any]]:
         """
-        card_table.mark_row(id="123456", name="ANNNNN")
-        card_table.mark_row(ip="192.168.0.18", mark=False)
+        card_table.mark_row(id="123456", name="IRDevice.Lounge1")
+        card_table.mark_row(ip="192.168.0.18", mark=False) #Unmark
         """
         found = []
         for row in self.table.rows:
@@ -249,7 +259,8 @@ class CardTable:
             else:
                 on_change(e.sender.value)
 
-        chbox.on("click", handle_change)
+        # chbox.on("click", handle_change)
+        chbox.on("update:model-value", handle_change)
         setattr(self, f"chbox{chbox_txt.replace(' ', '_')}", chbox)
         return chbox
 
