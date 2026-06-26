@@ -33,8 +33,8 @@ def main() -> None:
     found = card_table.mark_row(id="129956")
     print(f" ==> found: {found}")  # //Dima
 
-    card_table.set_row_display_filter("_marked", True)
-    # card_table.set_row_display_filter(field_name="id", field_value="123456")
+    card_table.set_row_display_filter(_marked=True)
+    # card_table.set_row_display_filter(id="123456")
 
     # self.table.props(':filter="\'online\'"')
     # self.table.update()

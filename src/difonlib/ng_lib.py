@@ -49,7 +49,9 @@ class DialogBox:
                     btn_ok,
                     on_click=lambda: (on_click_ok(), dialog.close()),
                 )
-                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
+                ui.button(
+                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
+                )
         dialog.open()
 
     async def dialog_confirm(
@@ -134,7 +136,9 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes("text-base")
+                    self.processing_label = ui.label("Processing...").classes(
+                        "text-base"
+                    )
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
@@ -155,33 +159,34 @@ class CardTable:
         """Add field 'name', needed for Quasar GUI"""
         return [{**col, "name": col.get("name", col["field"])} for col in columns]
 
-    def set_row_display_filter(self, field_name: str, field_value: str | bool) -> None:
+    def set_row_display_filter(self, **field: str | bool) -> None:
         """
-        card_table.set_row_display_filter("id","123456")
-         Show rows with field id='123456':
-        card_table.row_display_filter(state_on=True)
-         Show all rows:
-        card_table.row_display_filter()
+        card_table.set_row_display_filter(id="123456")
+        card_table.set_row_display_filter(_marked=True)
         """
+        assert len(field) == 1, "❌ Exactly one field expected"
+        field_name, field_value = next(iter(field.items()))
         if isinstance(field_value, bool):
-            self.filter_value = field_value
+            self.filter_value = str(field_value).lower()  # "true" / "false" для JS
         else:
             self.filter_value = f"\\'{field_value}\\'"
-
-        self.table.props(rf"""
+        self.table.props(
+            rf"""
             :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field_name} === terms)"
-            """)
+            """
+        )
 
     def row_display_filter(self, state_on: bool = False) -> None:
         """
-        card_table.set_row_display_filter(field_name="id", field_value="123456")
+          Show rows with field id='123456' :
+        card_table.set_row_display_filter(id="123456")
         card_table.row_display_filter(state_on=True)
-         Show rows with field id='123456'
-        card_table.set_row_display_filter("_marked", True)
+          Show rows with field _marked=True :
+        card_table.set_row_display_filter(_marked=True)
         card_table.row_display_filter(True)
-         Show rows with field _marked=True
+          Show all rows:
+        card_table.row_display_filter()
         """
-        dbg(f"self.filter_value: {self.filter_value}")  # //Dima
         if state_on:
             self.table.props(f':filter="{self.filter_value}"')
         else:
