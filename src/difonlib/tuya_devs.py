@@ -83,7 +83,9 @@ class TuyaDevs:
             scan_data: dict = json.load(f)
         return cast(dict, scan_data["devices"])
 
-    def scan(self, timeout: int = 8, by_id: bool = True) -> dict[str, dict[str, Any]] | Any:
+    def scan(
+        self, timeout: int = 8, by_id: bool = True
+    ) -> dict[str, dict[str, Any]] | Any:
         """Scan by ID (default)
         Return: {'bf36796bdace7a62fav1ys': {'ip': '192.168.0.82',
         'gwId': 'bf36796bdace7a62fav1ys',
@@ -101,7 +103,9 @@ class TuyaDevs:
         'dev_type': 'default',
         'origin': 'broadcast'}}
         """
-        self.devs_online = tinytuya.deviceScan(verbose=False, maxretry=timeout, byID=by_id)
+        self.devs_online = tinytuya.deviceScan(
+            verbose=False, maxretry=timeout, byID=by_id
+        )
         return self.devs_online
 
     # def get_connected_devs(self, force_update: bool = False) -> list[dict]:
@@ -125,7 +129,14 @@ class TuyaDevs:
     #         ]
     #     return con_devs
 
-    def dev_is_connected(self, dev_id: str, timeout: int = 8, rescan: bool = False) -> bool:
+    def dev_is_connected(
+        self, dev_id: str, timeout: int = 8, rescan: bool = False
+    ) -> bool:
+        """
+        if rescan:
+           self.scan(timeout=timeout)
+        Check if dev_id in last scan list (self.devs_online)
+        """
         if rescan:
             # update self.devs_online
             self.scan(timeout=timeout)
@@ -158,7 +169,9 @@ class TuyaDevs:
         self.last_scan = all_devs
         return all_devs
 
-    def ir_dev(self, dev_id: str, local_key: str) -> Optional[Contrib.IRRemoteControlDevice]:
+    def ir_dev(
+        self, dev_id: str, local_key: str
+    ) -> Optional[Contrib.IRRemoteControlDevice]:
         """Learn a new IR button key:
           btn_key = ir_dev.receive_button()
         Send btn_key:
@@ -178,9 +191,10 @@ class TuyaDevs:
         return dev
 
     def outlet_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
-        """TurnOn/Off:
+        """TurnOn/Off & toggle:
         odev.turn_on()
         odev.turn_off()
+        odev.toggle()
         """
         try:
             dev = OutletDeviceM(

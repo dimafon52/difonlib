@@ -1,3 +1,5 @@
+import functools
+from os import close
 from nicegui import ui
 import inspect
 import asyncio
@@ -26,8 +28,94 @@ ui.add_css(
     shared=True,
 )
 
+import threading
+
 
 class DialogBox:
+
+    async def dialog_processing(
+        self,
+        proc: Callable,
+        proc_cancel_event: bool = False,
+        label_txt: str = "Processing...",
+        label_txt_color: str = "green",
+        timeout: int | None = None,
+    ) -> Literal["OK", "Canceled", "Timeout"]:
+        """
+        def proc_dummy(cnt:int = 30) -> None:
+            for i in range(cnt, 0, -1):
+                time.sleep(1)
+        dialog_box.dialog_processing(functools.partial(proc_dummy, cnt=4), timeout=5),
+
+        def proc_dummy(cancel_event: threading.Event) -> None:
+            for i in range(10, 0, -1):
+                if cancel_event.is_set():
+                    print(f"Exit")
+                    return
+                time.sleep(1)
+        dialog_box.dialog_processing(
+           proc_dummy, proc_cancel_event=True, timeout=4)
+        """
+        task_proc: asyncio.Task | None = None
+        cancel_event = None
+        if proc_cancel_event:
+            cancel_event = threading.Event()
+
+        async def countdown(timeout: int, label: ui.label):
+            for counter in range(timeout, 0, -1):
+                label.text = f"{label_txt}{counter}"
+                await asyncio.sleep(1)
+
+        canceled = False
+        ret_value: str = "OK"
+
+        async def on_cancel():
+            nonlocal canceled
+            canceled = True
+            if cancel_event:
+                cancel_event.set()
+            if task_proc:
+                task_proc.cancel()
+            dialog.close()
+
+        text_color = f"text-{label_txt_color}-500"
+        with (
+            ui.dialog().props("persistent") as dialog,
+            ui.card().classes("p-4 items-center justify-center"),
+        ):
+            with ui.row().classes("items-center gap-3"):
+                ui.spinner(size="md")
+                label = ui.label(f"{label_txt}").classes(f"{text_color} text-2xl")
+                ui.button("Cancel", on_click=on_cancel)
+        dialog.open()
+        task_count: asyncio.Task | None = None
+        if timeout:
+            task_count = asyncio.create_task(countdown(timeout=timeout, label=label))
+
+        if proc_cancel_event:
+            if inspect.iscoroutinefunction(getattr(proc, "func", proc)):
+                task_proc = asyncio.create_task(proc(cancel_event))
+            else:
+                task_proc = asyncio.create_task(asyncio.to_thread(proc, cancel_event))
+        else:
+            if inspect.iscoroutinefunction(getattr(proc, "func", proc)):
+                task_proc = asyncio.create_task(proc())
+            else:
+                task_proc = asyncio.create_task(asyncio.to_thread(proc))
+
+        try:
+            await asyncio.wait_for(task_proc, timeout=timeout)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if cancel_event:
+                cancel_event.set()
+            ret_value = "Canceled" if canceled else "Timeout"
+            ui.notify(ret_value)
+        finally:
+            if task_count and not task_count.cancelled():
+                task_count.cancel()
+            dialog.close()
+        return ret_value
+
     async def dialog_ok(self, text: str = "Hello!)") -> None:
         with ui.dialog().props("persistent") as dialog, ui.card():
             ui.label(text=text)

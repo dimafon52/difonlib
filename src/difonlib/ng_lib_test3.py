@@ -1,10 +1,37 @@
+import asyncio
+from typing import Any
 from nicegui import ui
 from ng_lib import CardTable, DialogBox
 import functools
 
+import time
+
 from difonlib.bt_utils import logdbg
 
 dbg = logdbg
+
+import threading
+
+
+def proc_dummy2(cancel_event: threading.Event) -> None:
+    for i in range(10, 0, -1):
+        if cancel_event.is_set():
+            print(f"Exit")
+            return
+        print(f"Remaining: {i}")
+        time.sleep(1)
+
+
+def proc_dummy(cnt: int = 20) -> None:
+    for i in range(cnt, 0, -1):
+        print(f"Remaining: {i}")
+        time.sleep(1)
+
+
+async def aproc_dummy(cnt: int = 20):
+    for i in range(cnt, 0, -1):
+        print(f"aRemaining: {i}")
+        await asyncio.sleep(1)
 
 
 @ui.page("/", dark=True)
@@ -98,6 +125,17 @@ def main() -> None:
     card_table.add_button(
         "test_input",
         on_click=dialog_input,
+    )
+
+    ui.button(
+        "Test processing dialog",
+        # on_click=lambda: dialog_box.dialog_processing(proc_dummy, timeout=4),
+        on_click=lambda: dialog_box.dialog_processing(
+            functools.partial(aproc_dummy, cnt=5), timeout=6
+        ),
+        # on_click=lambda: dialog_box.dialog_processing(
+        #     proc_dummy2, proc_cancel_event=True, timeout=4
+        # ),
     )
 
 
