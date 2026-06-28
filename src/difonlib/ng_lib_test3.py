@@ -1,22 +1,19 @@
 import asyncio
-from typing import Any
 from nicegui import ui
 from ng_lib import CardTable, DialogBox
 import functools
-
+import threading
 import time
 
 from difonlib.bt_utils import logdbg
 
 dbg = logdbg
 
-import threading
-
 
 def proc_dummy2(cancel_event: threading.Event) -> None:
     for i in range(10, 0, -1):
         if cancel_event.is_set():
-            print(f"Exit")
+            print("Exit")
             return
         print(f"Remaining: {i}")
         time.sleep(1)
@@ -28,10 +25,11 @@ def proc_dummy(cnt: int = 20) -> None:
         time.sleep(1)
 
 
-async def aproc_dummy(cnt: int = 20):
+async def aproc_dummy(cnt: int = 20) -> int:
     for i in range(cnt, 0, -1):
         print(f"aRemaining: {i}")
         await asyncio.sleep(1)
+    return 125
 
 
 @ui.page("/", dark=True)
@@ -127,12 +125,20 @@ def main() -> None:
         on_click=dialog_input,
     )
 
+    async def proc_dialog() -> None:
+        err, result = await dialog_box.dialog_processing(
+            functools.partial(aproc_dummy, cnt=4), timeout=5
+        )
+        dbg(f"ERROR: {err}; Result: {result}")  # //Dima
+        ui.notify(f"ERROR: {err}; Result: {result}")
+
     ui.button(
         "Test processing dialog",
+        on_click=proc_dialog,
         # on_click=lambda: dialog_box.dialog_processing(proc_dummy, timeout=4),
-        on_click=lambda: dialog_box.dialog_processing(
-            functools.partial(aproc_dummy, cnt=5), timeout=6
-        ),
+        # on_click=lambda: dialog_box.dialog_processing(
+        #     functools.partial(aproc_dummy, cnt=5), timeout=6
+        # ),
         # on_click=lambda: dialog_box.dialog_processing(
         #     proc_dummy2, proc_cancel_event=True, timeout=4
         # ),

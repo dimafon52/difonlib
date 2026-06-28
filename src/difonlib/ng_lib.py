@@ -1,10 +1,8 @@
-import functools
-from os import close
 from nicegui import ui
 import inspect
 import asyncio
 from typing import Any, Callable, Awaitable, Literal
-
+import threading
 from difonlib.utils import logdbg
 
 dbg = logdbg
@@ -28,8 +26,6 @@ ui.add_css(
     shared=True,
 )
 
-import threading
-
 
 class DialogBox:
 
@@ -40,36 +36,47 @@ class DialogBox:
         label_txt: str = "Processing...",
         label_txt_color: str = "green",
         timeout: int | None = None,
-    ) -> Literal["OK", "Canceled", "Timeout"]:
+    ) -> tuple[Literal["Canceled", "Timeout"] | None, Any | None]:
         """
-        def proc_dummy(cnt:int = 30) -> None:
-            for i in range(cnt, 0, -1):
-                time.sleep(1)
-        dialog_box.dialog_processing(functools.partial(proc_dummy, cnt=4), timeout=5),
-
-        def proc_dummy(cancel_event: threading.Event) -> None:
+        See examples in ng_lib_test3.py
+        def proc_dummy2(cancel_event: threading.Event) -> None:
             for i in range(10, 0, -1):
                 if cancel_event.is_set():
                     print(f"Exit")
                     return
+                print(f"Remaining: {i}")
                 time.sleep(1)
-        dialog_box.dialog_processing(
-           proc_dummy, proc_cancel_event=True, timeout=4)
+        async def aproc_dummy(cnt: int = 20):
+            for i in range(cnt, 0, -1):
+                print(f"aRemaining: {i}")
+                await asyncio.sleep(1)
+            return 125
+
+        async def proc_dialog():
+            err, result = await dialog_box.dialog_processing(
+                functools.partial(aproc_dummy, cnt=4), timeout=5
+            )
+        dbg(f"ERROR: {err}; Result: {result}")  # //Dima
+        ui.button(
+           "Test processing dialog",
+           on_click=proc_dialog,
+        )
         """
         task_proc: asyncio.Task | None = None
         cancel_event = None
         if proc_cancel_event:
             cancel_event = threading.Event()
 
-        async def countdown(timeout: int, label: ui.label):
+        async def countdown(timeout: int, label: ui.label) -> None:
             for counter in range(timeout, 0, -1):
                 label.text = f"{label_txt}{counter}"
                 await asyncio.sleep(1)
 
         canceled = False
-        ret_value: str = "OK"
+        ret_value: Any | None = None
+        err: Literal["Canceled", "Timeout"] | None = None
 
-        async def on_cancel():
+        async def on_cancel() -> None:
             nonlocal canceled
             canceled = True
             if cancel_event:
@@ -104,17 +111,19 @@ class DialogBox:
                 task_proc = asyncio.create_task(asyncio.to_thread(proc))
 
         try:
-            await asyncio.wait_for(task_proc, timeout=timeout)
+            ret_value = await asyncio.wait_for(task_proc, timeout=timeout)
         except (asyncio.TimeoutError, asyncio.CancelledError):
             if cancel_event:
                 cancel_event.set()
-            ret_value = "Canceled" if canceled else "Timeout"
-            ui.notify(ret_value)
+            err = "Canceled" if canceled else "Timeout"
+            ui.notify(err)
+
         finally:
             if task_count and not task_count.cancelled():
                 task_count.cancel()
             dialog.close()
-        return ret_value
+
+            return (err, ret_value)
 
     async def dialog_ok(self, text: str = "Hello!)") -> None:
         with ui.dialog().props("persistent") as dialog, ui.card():
