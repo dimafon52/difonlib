@@ -36,7 +36,8 @@ class DialogBox:
         label_txt: str = "Processing...",
         label_txt_color: str = "green",
         timeout: int | None = None,
-    ) -> tuple[Literal["Canceled", "Timeout"] | None, Any | None]:
+        btn_cancel: str | None = "Cancel",
+    ) -> Any | None:
         """
         See examples in ng_lib_test3.py
         def proc_dummy2(cancel_event: threading.Event) -> None:
@@ -53,10 +54,9 @@ class DialogBox:
             return 125
 
         async def proc_dialog():
-            err, result = await dialog_box.dialog_processing(
+            result = await dialog_box.dialog_processing(
                 functools.partial(aproc_dummy, cnt=4), timeout=5
             )
-        dbg(f"ERROR: {err}; Result: {result}")  # //Dima
         ui.button(
            "Test processing dialog",
            on_click=proc_dialog,
@@ -74,7 +74,6 @@ class DialogBox:
 
         canceled = False
         ret_value: Any | None = None
-        err: Literal["Canceled", "Timeout"] | None = None
 
         async def on_cancel() -> None:
             nonlocal canceled
@@ -93,7 +92,8 @@ class DialogBox:
             with ui.row().classes("items-center gap-3"):
                 ui.spinner(size="md")
                 label = ui.label(f"{label_txt}").classes(f"{text_color} text-2xl")
-                ui.button("Cancel", on_click=on_cancel)
+                if btn_cancel:
+                    ui.button(btn_cancel, on_click=on_cancel)
         dialog.open()
         task_count: asyncio.Task | None = None
         if timeout:
@@ -115,19 +115,21 @@ class DialogBox:
         except (asyncio.TimeoutError, asyncio.CancelledError):
             if cancel_event:
                 cancel_event.set()
-            err = "Canceled" if canceled else "Timeout"
-            ui.notify(err)
+            status = "Canceled" if canceled else "Timeout"
+            ui.notify(status)
+        except Exception as e:
+            ui.notify(str(e))
 
         finally:
             if task_count and not task_count.cancelled():
                 task_count.cancel()
             dialog.close()
 
-            return (err, ret_value)
+        return ret_value
 
-    async def dialog_ok(self, text: str = "Hello!)") -> None:
+    async def dialog_msg(self, msg_text: str) -> None:
         with ui.dialog().props("persistent") as dialog, ui.card():
-            ui.label(text=text)
+            ui.label(text=msg_text)
             ui.button("Close", on_click=dialog.close)
         dialog.open()
 

@@ -46,7 +46,7 @@ class TuyaDevs:
         self.xml_file = xml_file
         self.xmlcfg_devs = self.load_cfg()
         self.devs_online: dict[str, dict[str, Any]] | Any = {}
-        self.last_scan: list[dict[str, str]] | None = None
+        self.last_scan: list[dict[str, Any]] | None = None
 
     def load_cfg(self) -> List[Dict[str, Any]]:
         """Return list of tuya devices as list of dictionaries"""
@@ -138,66 +138,78 @@ class TuyaDevs:
 
     def get_devs(self, scan_timeout: int = 8) -> list[dict[str, str]]:
         """
-        Scan devices for connect (online)
+        Show all devices in Tuya Smart
         """
         self.scan(timeout=scan_timeout)
-        all_devs: list = []
+        self.last_scan = []
         for dev in self.xmlcfg_devs:
             dev_id = dev["devId"]
-            dev_prod_key = dev.get("productId")
             dev_name = dev.get("name")
             dev_lk = dev.get("localKey")
             dev_ip = self.devs_online.get(dev_id, {}).get("ip")
-            # first online devices
-            index = 0 if dev_ip else len(all_devs)
-            all_devs.insert(
-                index,
+            # # first online devices
+            # index = 0 if dev_ip else len(all_devs)
+            # all_devs.insert(
+            #     index,
+            #     {
+            #         "id": dev_id,
+            #         "ip": dev_ip,
+            #         "name": dev_name,
+            #         "localkey": dev_lk,
+            #         "prod_key": dev_prod_key,
+            #     },
+            # )
+            self.last_scan.append(
                 {
                     "id": dev_id,
                     "ip": dev_ip,
                     "name": dev_name,
                     "localkey": dev_lk,
-                    "prod_key": dev_prod_key,
                 },
             )
-        self.last_scan = all_devs
-        return all_devs
+
+        return self.last_scan
+
+    # Check for IR device, outlet device have not attribute 'control_type'
+    # In [117]: getattr(ird_salon, 'control_type', None)
+    # Out[117]: 2
 
     def ir_dev(self, dev_id: str, local_key: str) -> Optional[Contrib.IRRemoteControlDevice]:
-        """Learn a new IR button key:
+        """
+        try:
+            ir_dev = td.ir_dev(dev_id='246268803c6105c1ed14', local_key='b70044a2c170177b')
+        except Exception as e:
+            print(f" ❌ ir_dev: {e}.")
+        Learn a new IR button key:
           btn_key = ir_dev.receive_button()
         Send btn_key:
           ir_dev.send_button(btn_key)
         """
-        try:
-            dev = Contrib.IRRemoteControlDevice(
-                dev_id=dev_id,
-                # address            = '192.168.0.89', #- no must
-                local_key=local_key,
-                persist=True,
-                connection_timeout=5,
-            )
-        except Exception as e:
-            print(f" ❌ ir_dev(): {e}")
-            return None
+        dev = Contrib.IRRemoteControlDevice(
+            dev_id=dev_id,
+            # address            = '192.168.0.89', #- no must
+            local_key=local_key,
+            persist=True,
+            connection_timeout=5,
+        )
         return dev
 
     def outlet_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
         """TurnOn/Off & toggle:
+        try:
+            odev = td.outlet_dev(dev_id='246268803c6105c1ed14', local_key='b70044a2c170177b')
+        except Exception as e:
+            print(f" ❌ outlet_dev: {e}.")
         odev.turn_on()
         odev.turn_off()
         odev.toggle()
         """
-        try:
-            dev = OutletDeviceM(
-                dev_id=dev_id,
-                local_key=local_key,
-                persist=True,
-                connection_timeout=5,
-            )
-        except Exception as e:
-            print(f" ❌ outlet_dev(): {e}")
-            return None
+        dev = OutletDeviceM(
+            dev_id=dev_id,
+            local_key=local_key,
+            persist=True,
+            connection_timeout=5,
+        )
         return dev
 
 
