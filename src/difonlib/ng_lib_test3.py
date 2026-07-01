@@ -127,11 +127,14 @@ def main() -> None:
     )
 
     async def proc_dialog() -> None:
-        result = await dialog_box.dialog_processing(
-            functools.partial(aproc_dummy, cnt=4),
-            timeout=5,  # btn_cancel=None
-        )
-        ui.notify(f"Result: {result}")
+        try:
+            result = await dialog_box.dialog_processing(
+                functools.partial(aproc_dummy, cnt=4),
+                timeout=5,  # btn_cancel=None
+            )
+            ui.notify(f"Result: {result}")
+        except Exception as e:
+            ui.notify(e, type="negative")
 
     ui.button(
         "Test processing dialog",

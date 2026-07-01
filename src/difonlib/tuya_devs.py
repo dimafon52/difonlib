@@ -83,7 +83,9 @@ class TuyaDevs:
             scan_data: dict = json.load(f)
         return cast(dict, scan_data["devices"])
 
-    def scan(self, timeout: int = 8, by_id: bool = True) -> dict[str, dict[str, Any]] | Any:
+    def scan(
+        self, timeout: int = 8, by_id: bool = True
+    ) -> dict[str, dict[str, Any]] | Any:
         """Scan by ID (default)
         Return: {'bf36796bdace7a62fav1ys': {'ip': '192.168.0.82',
         'gwId': 'bf36796bdace7a62fav1ys',
@@ -101,7 +103,9 @@ class TuyaDevs:
         'dev_type': 'default',
         'origin': 'broadcast'}}
         """
-        self.devs_online = tinytuya.deviceScan(verbose=False, maxretry=timeout, byID=by_id)
+        self.devs_online = tinytuya.deviceScan(
+            verbose=False, maxretry=timeout, byID=by_id
+        )
         return self.devs_online
 
     # def get_connected_devs(self, force_update: bool = False) -> list[dict]:
@@ -125,7 +129,9 @@ class TuyaDevs:
     #         ]
     #     return con_devs
 
-    def dev_is_connected(self, dev_id: str, timeout: int = 8, rescan: bool = False) -> bool:
+    def dev_is_connected(
+        self, dev_id: str, timeout: int = 8, rescan: bool = False
+    ) -> bool:
         """
         if rescan:
            self.scan(timeout=timeout)
@@ -174,7 +180,9 @@ class TuyaDevs:
     # In [117]: getattr(ird_salon, 'control_type', None)
     # Out[117]: 2
 
-    def ir_dev(self, dev_id: str, local_key: str) -> Optional[Contrib.IRRemoteControlDevice]:
+    def ir_dev(
+        self, dev_id: str, local_key: str
+    ) -> Optional[Contrib.IRRemoteControlDevice]:
         """
         try:
             ir_dev = td.ir_dev(dev_id='246268803c6105c1ed14', local_key='b70044a2c170177b')
@@ -211,6 +219,8 @@ class TuyaDevs:
             connection_timeout=5,
         )
         return dev
+
+    # def get_dev_type(dev:)
 
 
 dbg = print

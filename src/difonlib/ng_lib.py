@@ -116,9 +116,9 @@ class DialogBox:
             if cancel_event:
                 cancel_event.set()
             status = "Canceled" if canceled else "Timeout"
-            ui.notify(status)
+            ui.notify(status, type="warning")
         except Exception as e:
-            ui.notify(str(e))
+            ui.notify(str(e), type="negative", position="center")
 
         finally:
             if task_count and not task_count.cancelled():
