@@ -148,9 +148,7 @@ class DialogBox:
                     btn_ok,
                     on_click=lambda: (on_click_ok(), dialog.close()),
                 )
-                ui.button(
-                    btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close())
-                )
+                ui.button(btn_cancel, on_click=lambda: (on_click_cancel(), dialog.close()))
         dialog.open()
 
     async def dialog_confirm(
@@ -235,9 +233,7 @@ class CardTable:
             ):
                 with ui.row().classes("items-center gap-3"):
                     self.processing_spinner = ui.spinner(size="md")
-                    self.processing_label = ui.label("Processing...").classes(
-                        "text-base"
-                    )
+                    self.processing_label = ui.label("Processing...").classes("text-base")
 
         if self.marked_field:
             color_class = f"text-{self.marked_text_color}"
@@ -269,11 +265,9 @@ class CardTable:
             self.filter_value = str(field_value).lower()  # "true" / "false" для JS
         else:
             self.filter_value = f"\\'{field_value}\\'"
-        self.table.props(
-            rf"""
+        self.table.props(rf"""
             :filter-method="(rows, terms) => !terms ? rows : rows.filter(r => r.{field_name} === terms)"
-            """
-        )
+            """)
 
     def row_display_filter(self, state_on: bool = False) -> None:
         """
