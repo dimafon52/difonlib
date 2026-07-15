@@ -194,7 +194,7 @@ class TuyaDevs:
         )
         return dev
 
-    def outlet_dev(self, dev_id: str, local_key: str) -> Optional[OutletDevice]:
+    def outlet_dev(self, dev_id: str, local_key: str) -> Optional[OutletDeviceM]:
         """TurnOn/Off & toggle:
         try:
             odev = td.outlet_dev(dev_id='246268803c6105c1ed14', local_key='b70044a2c170177b')
