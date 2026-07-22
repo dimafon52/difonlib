@@ -311,8 +311,13 @@ class CardTable:
                 btn.classes("!bg-blue-500", remove="!bg-gray-500").enable()
             else:
                 btn.classes("!bg-gray-500", remove="!bg-blue-500").disable()
+        # for handler in self.on_selection_change:
+        #     await handler(e)
         for handler in self.on_selection_change:
-            await handler(e)
+            if inspect.iscoroutinefunction(handler):
+                await handler()
+            else:
+                handler()
 
     async def _run_with_processing(self, handler: Callable) -> None:
         self.processing_dialog.open()
@@ -321,7 +326,7 @@ class CardTable:
                 await handler()
             else:
                 handler()
-            await asyncio.sleep(0.1)
+            # await asyncio.sleep(0.1)
         finally:
             self.processing_dialog.close()
 
