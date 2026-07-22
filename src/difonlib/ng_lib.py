@@ -315,9 +315,9 @@ class CardTable:
         #     await handler(e)
         for handler in self.on_selection_change:
             if inspect.iscoroutinefunction(handler):
-                await handler()
+                await handler(e)
             else:
-                handler()
+                handler(e)
 
     async def _run_with_processing(self, handler: Callable) -> None:
         self.processing_dialog.open()
