@@ -38,6 +38,29 @@ MSG_COLOR = f"\x1b[{RESET};38;5;{45}m"
 # INFO     20
 # DEBUG    10
 # NOTSET    0
+# See color_table command in bash(~/.bashrc)
+# TEXT_COLOR = 228
+# TEXT_COLOR = 63
+TXT_COLOR = 214
+
+# Text print style
+TXT_STYLE_RESET = 0
+TXT_STYLE_BOLD = 1
+TXT_STYLE_DARKEN = 2
+TXT_STYLE_ITALIC = 3
+TXT_STYLE_UNDERLINE = 4
+TXT_STYLE_BLINK_SLOW = 5
+TXT_STYLE_BLINK_FAST = 6
+TXT_STYLE_REVERSE = 7
+TXT_STYLE_HIDE = 8
+TXT_STYLE_CROSS_OUT = 9
+COLOR_OFF = "\x1b[0m"
+MSG_COLOR = f"\x1b[{TXT_STYLE_RESET};38;5;{TXT_COLOR}m"
+
+
+def printc(msg: str, color: int = TXT_COLOR, style: int = TXT_STYLE_RESET) -> None:
+    attrb = f"\x1b[{style};38;5;{color}m"
+    print(f"{attrb}{msg}{COLOR_OFF}")
 
 
 # Глобальные логгеры библиотек — заглушить

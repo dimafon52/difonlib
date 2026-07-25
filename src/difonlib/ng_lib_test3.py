@@ -28,9 +28,9 @@ def proc_dummy(cnt: int = 20) -> None:
 async def aproc_dummy(cnt: int = 20) -> int:
     for i in range(cnt, 0, -1):
         print(f"aRemaining: {i}")
-        await asyncio.sleep(2)
-        raise RuntimeError("Runtime ERROR simulation")
-    return 125
+        await asyncio.sleep(1)
+    raise RuntimeError("Runtime ERROR simulation")
+    # return 125
 
 
 @ui.page("/", dark=True)
@@ -129,8 +129,8 @@ def main() -> None:
     async def proc_dialog() -> None:
         try:
             result = await dialog_box.dialog_processing(
-                functools.partial(aproc_dummy, cnt=4),
-                timeout=5,  # btn_cancel=None
+                functools.partial(aproc_dummy, cnt=16),
+                timeout=8,  # btn_cancel=None
             )
             ui.notify(f"Result: {result}")
         except Exception as e:

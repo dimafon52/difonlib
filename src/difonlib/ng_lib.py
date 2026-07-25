@@ -116,6 +116,7 @@ class DialogBox:
             if cancel_event:
                 cancel_event.set()
             status = "Canceled" if canceled else "Timeout"
+            dbg(f" **** status: {status}")  # //Dima
             ui.notify(status, type="warning")
         except Exception as e:
             ui.notify(str(e), type="negative", position="center")
