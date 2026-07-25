@@ -41,7 +41,8 @@ MSG_COLOR = f"\x1b[{RESET};38;5;{45}m"
 # See color_table command in bash(~/.bashrc)
 # TEXT_COLOR = 228
 # TEXT_COLOR = 63
-TXT_COLOR = 214
+# TXT_COLOR = 214
+LOGGER_DEBUG_TXT_COLOR = 45
 
 # Text print style
 TXT_STYLE_RESET = 0
@@ -55,12 +56,14 @@ TXT_STYLE_REVERSE = 7
 TXT_STYLE_HIDE = 8
 TXT_STYLE_CROSS_OUT = 9
 COLOR_OFF = "\x1b[0m"
-MSG_COLOR = f"\x1b[{TXT_STYLE_RESET};38;5;{TXT_COLOR}m"
+MSG_COLOR = f"\x1b[{TXT_STYLE_RESET};38;5;{LOGGER_DEBUG_TXT_COLOR}m"
+
+PRINTC_TXT_COLOR = 214
 
 
 def printc(msg: str, color: int | None = None, style: int | None = None) -> None:
     if not color:
-        color = TXT_COLOR
+        color = PRINTC_TXT_COLOR
     if not style:
         style = TXT_STYLE_RESET
     attrb = f"\x1b[{style};38;5;{color}m"
