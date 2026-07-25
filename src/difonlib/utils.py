@@ -58,7 +58,11 @@ COLOR_OFF = "\x1b[0m"
 MSG_COLOR = f"\x1b[{TXT_STYLE_RESET};38;5;{TXT_COLOR}m"
 
 
-def printc(msg: str, color: int = TXT_COLOR, style: int = TXT_STYLE_RESET) -> None:
+def printc(msg: str, color: int | None = None, style: int | None = None) -> None:
+    if not color:
+        color = TXT_COLOR
+    if not style:
+        style = TXT_STYLE_RESET
     attrb = f"\x1b[{style};38;5;{color}m"
     print(f"{attrb}{msg}{COLOR_OFF}")
 
